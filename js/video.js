@@ -11,6 +11,9 @@ let player = null;
 let candidates = [];
 let onClose = null;
 let hudTimer;
+let adHintTimer;
+const DEFAULT_HINT = 'OK pausa · ◀ ▶ 10s · Voltar fecha e retoma o Spotify';
+const setHint = (t) => { document.querySelector('#video .video-hint').textContent = t; };
 
 const $ = (id) => document.getElementById(id);
 export const isVideoOpen = () => !$('video').hidden;
@@ -92,13 +95,24 @@ function playNext() {
     height: '100%',
     playerVars: { autoplay: 1, controls: 0, rel: 0, playsinline: 1, iv_load_policy: 3, fs: 0, disablekb: 1, modestbranding: 1 },
     events: {
-      onReady: (e) => e.target.playVideo(),
+      onReady: (e) => {
+        // A partir daqui o player do YouTube mostra o próprio carregamento (e os anúncios);
+        // nosso spinner sairia por cima deles.
+        $('video-loading').hidden = true;
+        e.target.playVideo();
+        adHintTimer = setTimeout(() => {
+          if (isVideoOpen() && player?.getPlayerState?.() !== window.YT.PlayerState.PLAYING) {
+            setHint('Anúncio do YouTube: ele termina sozinho em alguns segundos · Voltar fecha');
+            showHud(8000);
+          }
+        }, 2500);
+      },
       onStateChange: (e) => {
-        if (e.data === window.YT.PlayerState.PLAYING) $('video-loading').hidden = true;
+        if (e.data === window.YT.PlayerState.PLAYING) setHint(DEFAULT_HINT);
         if (e.data === window.YT.PlayerState.ENDED) closeVideo({ ended: true });
       },
       // 100 = removido, 101/150 = dono não permite embed → tenta o próximo
-      onError: () => playNext(),
+      onError: (e) => { console.warn('YouTube: erro', e.data); playNext(); },
     },
   });
 }
@@ -108,6 +122,7 @@ export async function openVideo(track, { onOpen, onClosed }) {
   onClose = onClosed;
   $('video').hidden = false;
   $('video-loading').hidden = false;
+  setHint(DEFAULT_HINT);
   $('video-title').textContent = `${track.name} — ${artistsText(track.artists)}`;
   showHud();
   onOpen?.();
@@ -126,6 +141,7 @@ export function closeVideo({ ended = false } = {}) {
   if (!isVideoOpen()) return;
   $('video').hidden = true;
   candidates = [];
+  clearTimeout(adHintTimer);
   try { player?.destroy(); } catch {}
   player = null;
   // A API recria o iframe no lugar desta div; garante que ela exista de novo
