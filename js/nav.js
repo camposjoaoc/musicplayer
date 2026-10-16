@@ -23,7 +23,59 @@ export function focus(el, { scroll = true, smooth = true } = {}) {
     el.classList.add('is-focused');
     document.dispatchEvent(new CustomEvent('focuschange', { detail: el }));
   }
-  if (scroll) el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
+  if (scroll) ensureVisible(el, smooth ? 'smooth' : 'auto');
+}
+
+// Rolagem própria em vez de scrollIntoView: com a seta segurada, cada tecla começaria
+// uma rolagem suave a partir do meio da anterior e os destinos se perdiam. Aqui cada
+// contêiner lembra o destino pendente e as próximas teclas partem dele.
+const pending = new WeakMap(); // contêiner → { top, left, at }
+
+function scrollTarget(box, axis) {
+  const p = pending.get(box);
+  return p && performance.now() - p.at < 700 ? p[axis] : axis === 'top' ? box.scrollTop : box.scrollLeft;
+}
+
+function scrollBox(box, axis, to, behavior) {
+  const max = axis === 'top' ? box.scrollHeight - box.clientHeight : box.scrollWidth - box.clientWidth;
+  to = Math.round(Math.max(0, Math.min(max, to)));
+  if (to === scrollTarget(box, axis)) return;
+  const p = { top: scrollTarget(box, 'top'), left: scrollTarget(box, 'left'), at: performance.now() };
+  p[axis] = to;
+  pending.set(box, p);
+  box.scrollTo({ [axis]: to, behavior });
+}
+
+function ensureVisible(el, behavior) {
+  const css = getComputedStyle(el);
+  const r = el.getBoundingClientRect();
+
+  // Fileira de cards: só horizontal
+  const row = el.closest('[data-nav-row]');
+  if (row) {
+    const rr = row.getBoundingClientRect();
+    const left = r.left - rr.left + row.scrollLeft; // posição absoluta dentro da fileira
+    const ml = parseFloat(css.scrollMarginLeft) || 0;
+    const mr = parseFloat(css.scrollMarginRight) || 0;
+    const view = scrollTarget(row, 'left');
+    if (left - ml < view) scrollBox(row, 'left', left - ml, behavior);
+    else if (left + r.width + mr > view + row.clientWidth) scrollBox(row, 'left', left + r.width + mr - row.clientWidth, behavior);
+  }
+
+  // Página: vertical
+  const page = el.closest('.view-scroll');
+  if (!page) return;
+  const pr = page.getBoundingClientRect();
+  const top = r.top - pr.top + page.scrollTop;
+  const h = page.clientHeight;
+  // Perto do começo da página vai até o topo, senão a saudação e a capa do destaque
+  // (que não são focáveis) ficam cortadas acima do primeiro item.
+  if (top < h * 0.6) return scrollBox(page, 'top', 0, behavior);
+  const mt = parseFloat(css.scrollMarginTop) || 0;
+  const mb = parseFloat(css.scrollMarginBottom) || 0;
+  const view = scrollTarget(page, 'top');
+  if (top - mt < view) scrollBox(page, 'top', top - mt, behavior);
+  else if (top + r.height + mb > view + h) scrollBox(page, 'top', top + r.height + mb - h, behavior);
 }
 
 export function focusFirst(root = activeRoot()) {
