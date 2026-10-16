@@ -170,6 +170,14 @@ img.broken { visibility: hidden; }
 .home-hero-sub { font-size: 1.5rem; color: rgba(255,255,255,0.85); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-hero .hero-actions { margin-top: 1rem; }
 .row h2, .section h2 { letter-spacing: -0.01em; }
+.tops { margin-bottom: 1rem; }
+.tops-head { display: flex; align-items: center; gap: 2rem; margin-bottom: 1.2rem; }
+.chips { display: flex; gap: 0.8rem; }
+.chip { padding: 0.55rem 1.4rem; border-radius: 999px; background: var(--surface-3); font-size: 1.2rem; font-weight: 700; color: var(--muted); }
+.chip.on { background: var(--text); color: #000; }
+.chip.is-focused { box-shadow: 0 0 0 0.25rem var(--accent); transform: scale(1.06); color: #000; background: var(--text); }
+.btn.save-btn.on { color: var(--accent); }
+.btn.save-btn.on.is-focused { color: #000; }
 .lead { color: var(--muted); font-size: 1.6rem; margin: -1rem 0 2.2rem; }
 .note { color: var(--muted); font-size: 1.4rem; padding: 1.5rem 0; max-width: 70rem; }
 .empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: 1.5rem; color: var(--muted); font-size: 1.6rem; padding: 4rem 0; max-width: 60rem; }
@@ -248,6 +256,16 @@ img.broken { visibility: hidden; }
 
 /* ---- Lista de faixas ---- */
 .tracks { display: flex; flex-direction: column; gap: 0.2rem; }
+.track-row { display: flex; align-items: center; gap: 0.6rem; }
+.track-row > .track { flex: 1; min-width: 0; }
+.track-more { width: 4rem; height: 4rem; flex: none; display: grid; place-items: center; border-radius: 50%; color: var(--faint); scroll-margin: 6rem 0 4rem; }
+.track-more .ic { width: 2.2rem; height: 2.2rem; }
+.track-more.is-focused { background: var(--focus); color: #000; transform: scale(1.08); }
+.track-row > .track.episode:has(.track-art) { grid-template-columns: 4rem minmax(0, 1fr) 7rem; }
+.track-row > .track.episode:not(:has(.track-art)) { grid-template-columns: 3.5rem minmax(0, 1fr) 7rem; }
+.ep-progress { height: 0.3rem; margin-top: 0.5rem; max-width: 22rem; border-radius: 1rem; background: rgba(255,255,255,0.15); overflow: hidden; }
+.ep-progress i { display: block; height: 100%; background: var(--accent); }
+.track.is-focused .ep-progress { background: rgba(0,0,0,0.15); }
 .track {
   display: grid; grid-template-columns: 3.5rem 4rem minmax(0, 1fr) minmax(0, 0.7fr) 5rem; align-items: center; gap: 1.2rem;
   padding: 0.6rem 1.2rem; border-radius: 0.6rem; scroll-margin: 6rem 0 4rem;
@@ -381,7 +399,13 @@ img.broken { visibility: hidden; }
 .np-controls .cbtn .ic { width: 2.8rem; height: 2.8rem; }
 .np-controls .cbtn.main { width: 7rem; height: 7rem; }
 .np-controls .cbtn.main .ic { width: 3.6rem; height: 3.6rem; }
-.np-actions { display: flex; gap: 1rem; margin-top: 1.4rem; }
+.np-actions { display: flex; align-items: center; gap: 1rem; margin-top: 1.4rem; }
+.np-actions-left, .np-actions-right { display: flex; align-items: center; gap: 1rem; }
+.vol { display: flex; align-items: center; gap: 0.3rem; padding: 0 0.4rem; height: 4.2rem; border-radius: 999px; background: rgba(255,255,255,0.12); }
+.vol .cbtn { width: 3.4rem; height: 3.4rem; }
+.vol .cbtn .ic { width: 2rem; height: 2rem; }
+.vol .cbtn.is-focused { background: var(--focus); color: #000; box-shadow: none; transform: scale(1.08); }
+.vol-val { min-width: 3.6rem; text-align: center; font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .cbtn.pill {
   width: auto; height: 4.2rem; display: flex; gap: 0.6rem; padding: 0 1.6rem 0 1.3rem; border-radius: 999px;
   background: rgba(255,255,255,0.12); font-size: 1.3rem; font-weight: 700;
@@ -423,10 +447,10 @@ img.broken { visibility: hidden; }
 .np.lyrics-open .np-artist { font-size: 1.6rem; color: rgba(255,255,255,0.75); }
 .np.lyrics-open .np-progress { grid-area: progress; margin-top: 0.6rem; }
 .np.lyrics-open .np-controls { grid-area: controls; margin-top: 0.2rem; }
-/* No modo letra, Voltar e Letra viram itens da grade: um em cada ponta da linha dos controles */
+/* No modo letra, os dois grupos de ações viram itens da grade: um em cada ponta da linha dos controles */
 .np.lyrics-open .np-actions { display: contents; }
-.np.lyrics-open #np-back-btn { grid-area: back; justify-self: start; }
-.np.lyrics-open #np-lyrics-btn { grid-area: actions; justify-self: end; }
+.np.lyrics-open .np-actions-left { grid-area: back; justify-self: start; }
+.np.lyrics-open .np-actions-right { grid-area: actions; justify-self: end; }
 .cbtn.pill.on { background: var(--accent); color: var(--accent-ink); }
 .cbtn.pill.on.is-focused { background: #3be477; box-shadow: 0 0 0 0.25rem var(--focus); }
 
@@ -446,6 +470,24 @@ img.broken { visibility: hidden; }
 .lyr-lines.is-plain .lyr-line { margin-bottom: 0.3rem; font-size: 1.8rem; font-weight: 700; color: rgba(255,255,255,0.85); }
 .lyr-msg { font-size: 1.9rem; font-weight: 700; color: rgba(255,255,255,0.7); }
 .lyr-credit { position: absolute; right: 0; bottom: -1.8rem; font-size: 1rem; color: rgba(255,255,255,0.4); }
+
+/* ---- Menu de ações ---- */
+.menu { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,0.55); display: flex; justify-content: flex-end; }
+.menu-panel {
+  width: 46rem; height: 100%; display: flex; flex-direction: column; padding: 4rem 2.5rem 3rem;
+  background: var(--surface-2); box-shadow: -2rem 0 6rem rgba(0,0,0,0.6); animation: menu-in 220ms ease-out;
+}
+@keyframes menu-in { from { transform: translateX(3rem); opacity: 0; } }
+.menu-head { padding: 0 1rem 2rem; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 1.2rem; }
+.menu-title { font-size: 2.2rem; font-weight: 800; line-height: 1.15; margin-top: 0.4rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.menu-sub { font-size: 1.3rem; color: var(--muted); margin-top: 0.3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-items { position: relative; flex: 1; overflow-y: auto; scrollbar-width: none; padding: 0.3rem; }
+.menu-items::-webkit-scrollbar { display: none; }
+.menu-item { display: flex; align-items: center; gap: 1.2rem; padding: 1.1rem 1.2rem; border-radius: 0.8rem; font-size: 1.5rem; font-weight: 700; scroll-margin: 2rem 0; }
+.menu-item .ic { width: 2.3rem; height: 2.3rem; color: var(--muted); }
+.menu-item.is-focused { background: var(--focus); color: #000; }
+.menu-item.is-focused .ic { color: #000; }
+.menu-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---- Diálogo e toast ---- */
 .dialog { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: rgba(0,0,0,0.72); }

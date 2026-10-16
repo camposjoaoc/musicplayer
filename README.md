@@ -11,13 +11,16 @@ hospedagem **HTTPS** (o DRM Widevine só funciona em contexto seguro) e acesso a
 
 | Peça | O que faz |
 |---|---|
-| `index.html` + `js/app.js` | App da TV: menu lateral recolhível, Início (com "Continuar ouvindo"), Busca (teclado na tela), Biblioteca, Tocando agora (fila "A seguir", relógio, capa desfocada ao fundo), Dispositivos |
+| `index.html` + `js/app.js` | App da TV: menu lateral recolhível, Início ("Continuar ouvindo", favoritos por período), Busca (músicas, artistas, álbuns, playlists, podcasts, episódios, audiolivros), Biblioteca, Podcasts e audiolivros, Tocando agora (fila, letra, volume de outros aparelhos), Dispositivos, menu de ações ⋯ (tocar em seguida, adicionar a playlist, curtir/salvar, ir para álbum/artista/podcast) |
 | `js/player.js` | Web Playback SDK (toca na TV) + Web API `/me/player` (controla qualquer dispositivo) |
 | `js/nav.js` | Navegação espacial pelas setas do controle |
 | `js/auth.js` | Login PKCE (sem segredo) — direto na TV ou pareando pelo celular via QR |
 | `pair.html` / `callback.html` | Páginas que o celular abre durante o pareamento |
 | `js/lyrics.js` | Letras sincronizadas via [LRCLIB](https://lrclib.net) (aberto, sem chave de API) |
 | `js/icons.js` | Ícones do [Phosphor Icons](https://phosphoricons.com) (MIT), só os usados no app |
+
+**Permissões:** se o app pedir para "entrar de novo", é porque ganhou recursos que precisam de
+permissões novas da conta (podcasts, editar playlists, seguir). Basta aceitar e fazer o login de novo.
 
 **Teclas do controle:** setas/OK navegam · Voltar volta (na tela inicial pergunta se quer sair) ·
 Play/Pause/Stop/⏩/⏪ controlam a música · CH+/CH− próxima/anterior ·

@@ -3,12 +3,12 @@ import * as auth from './auth.js';
 import { CLIENT_ID, DEVICE_NAME, REDIRECT_URI } from './config.js';
 import { activeRoot, focus, focusByKey, focusFirst, getFocused, isLayerOpen, move, popLayer, pushLayer, setBase } from './nav.js';
 import {
-  P, activateAudio, bus, cycleRepeat, explain, initSdk, next, play, position, prev, refresh,
+  P, activateAudio, addToQueue, bus, changeVolume, cycleRepeat, explain, initSdk, next, play, position, prev, refresh,
   seekBy, startPolling, toggleLike, togglePlay, toggleShuffle, transfer,
 } from './player.js';
 import { $, artistsText, colorOf, esc, fmtTime, hydrateIcons, icon, pickImage, store, toast } from './util.js';
 import { activeIndex, getLyrics, renderLines } from './lyrics.js';
-import { deviceIcon, lists, loadMore, searchKey, skeleton, views } from './views.js';
+import { allPlaylists, deviceIcon, lists, loadMore, searchKey, setSaveState, setTopRange, skeleton, views } from './views.js';
 
 const ctx = { me: null };
 const stack = [];
@@ -56,6 +56,7 @@ async function render({ restore = false } = {}) {
 
 function back() {
   if (!$('#dialog').hidden) return closeDialog();
+  if (menuOpen()) return closeMenu();
   if (lyricsOpen()) return closeLyrics();
   if (!$('#np').hidden) return closeNowPlaying();
   if (stack.length > 1) {
@@ -72,6 +73,7 @@ function back() {
 function nav(view) {
   if (!started) return;
   if (!$('#dialog').hidden) closeDialog();
+  if (menuOpen()) closeMenu();
   if (lyricsOpen()) closeLyrics();
   if (!$('#np').hidden) closeNowPlaying();
   go(view, {}, { root: true });
@@ -93,6 +95,100 @@ function closeDialog() {
   $('#dialog').hidden = true;
   popLayer($('#dialog'));
   dialogCb = null;
+}
+
+// ---- Menu de ações ------------------------------------------------------
+// Painel lateral com opções (fila, playlist, curtir, ir para…). Cada item é {icon, label, run}.
+
+let menuItems = [];
+const menuOpen = () => !$('#menu').hidden;
+
+function openMenu({ eyebrow = '', title, sub = '', items }) {
+  if (menuOpen()) closeMenu();
+  menuItems = items;
+  $('#menu-eyebrow').textContent = eyebrow;
+  $('#menu-title').textContent = title || '';
+  $('#menu-sub').textContent = sub;
+  $('#menu-items').innerHTML = items.map((it, i) =>
+    `<div class="menu-item" data-focus data-key="mi-${i}" data-action="menu-item" data-i="${i}">${icon(it.icon)}<span>${esc(it.label)}</span></div>`).join('');
+  $('#menu-items').scrollTop = 0;
+  $('#menu').hidden = false;
+  pushLayer($('#menu'));
+}
+
+function closeMenu() {
+  $('#menu').hidden = true;
+  popLayer($('#menu'));
+  menuItems = [];
+}
+
+// Fecha menu e player antes de navegar para outra tela
+function goFrom(type, id) {
+  if (menuOpen()) closeMenu();
+  if (!$('#np').hidden) closeNowPlaying();
+  go(type, { id });
+}
+
+async function openTrackMenu(d, { fromPlayer = false } = {}) {
+  const kind = d.type || 'track';
+  const isCurrent = d.uri === P.state?.track?.uri;
+  let saved = null;
+  try { saved = !!(await S.libContains([d.uri]))?.[0]; } catch {}
+  const items = [];
+  if (!fromPlayer && kind !== 'chapter') items.push({ icon: 'queue', label: 'Tocar em seguida', run: () => addToQueue(d.uri) });
+  if (kind === 'track') items.push({ icon: 'addTo', label: 'Adicionar a uma playlist', run: () => openPlaylistPicker(d) });
+  if (saved !== null && kind !== 'chapter') {
+    const [on, off] = kind === 'episode' ? ['Remover dos salvos', 'Salvar episódio'] : ['Remover das curtidas', 'Curtir'];
+    items.push({
+      icon: saved ? 'heart' : 'heartOutline', label: saved ? on : off,
+      run: async () => {
+        if (isCurrent && kind === 'track') return toggleLike();
+        await (saved ? S.libRemove([d.uri]) : S.libSave([d.uri]));
+        toast(saved ? 'Removido' : 'Salvo');
+      },
+    });
+  }
+  if (d.album) items.push({ icon: 'album', label: 'Ir para o álbum', run: () => goFrom('album', d.album) });
+  if (d.artist) items.push({ icon: 'person', label: 'Ir para o artista', run: () => goFrom('artist', d.artist) });
+  if (d.show) items.push({ icon: 'podcast', label: 'Ir para o podcast', run: () => goFrom('show', d.show) });
+  openMenu({ eyebrow: kind === 'episode' ? 'Episódio' : 'Música', title: d.name, sub: d.sub, items });
+}
+
+let editablePlaylists = null;
+async function openPlaylistPicker(d) {
+  editablePlaylists ||= (await allPlaylists()).filter((p) => p.owner?.id === ctx.me?.id || p.collaborative);
+  const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  openMenu({
+    eyebrow: 'Adicionar a uma playlist', title: d.name, sub: d.sub,
+    items: [
+      {
+        icon: 'plus', label: 'Nova playlist',
+        run: async () => {
+          const p = await S.createPlaylist(`Criada na TV · ${date}`, 'Criada pelo Spotify TV');
+          await S.addToPlaylist(p.id, [d.uri]);
+          editablePlaylists = null;
+          toast(`Adicionada à nova playlist “${p.name}”`);
+        },
+      },
+      ...editablePlaylists.map((p) => ({
+        icon: 'addTo', label: p.name,
+        run: async () => { await S.addToPlaylist(p.id, [d.uri]); toast(`Adicionada a “${p.name}”`); },
+      })),
+    ],
+  });
+}
+
+// Dados do menu para o que está tocando agora
+function currentMenuData() {
+  const t = P.state?.track;
+  if (!t) return null;
+  const episode = t.type === 'episode';
+  return {
+    uri: t.uri, name: t.name, sub: artistsText(t.artists), type: episode ? 'episode' : t.type === 'chapter' ? 'chapter' : 'track',
+    album: !episode ? t.album?.uri?.split(':')[2] : undefined,
+    artist: !episode ? t.artists?.[0]?.uri?.split(':')[2] : undefined,
+    show: episode ? t.album?.uri?.split(':')[2] : undefined,
+  };
 }
 
 // ---- Tocando agora -----------------------------------------------------
@@ -237,8 +333,14 @@ function renderPlayer() {
   $('#np-repeat').classList.toggle('on', !!s && s.repeat !== 'off');
   $('#np-repeat').innerHTML = icon(s?.repeat === 'track' ? 'repeatOne' : 'repeat');
 
+  $('#np-lyrics-btn').hidden = !t || t.type === 'episode' || t.type === 'chapter';
+  if ($('#np-lyrics-btn').hidden && lyricsOpen()) closeLyrics();
+
   const dev = s?.device;
   const devName = dev ? (dev.id === P.deviceId ? 'Esta TV' : dev.name) : '';
+  const remoteVol = !!dev?.canVolume && dev.id !== P.deviceId;
+  $('#np-vol').hidden = !remoteVol;
+  if (remoteVol) $('#np-vol-val').textContent = `${dev.volume}%`;
   $('#mini-device').innerHTML = dev ? `${icon(deviceIcon(dev.type))}<span>${esc(devName)}</span>` : '';
   $('#np-device').innerHTML = dev ? `${icon(deviceIcon(dev.type))}<span>${s.isPlaying ? 'Tocando' : 'Pausado'} em ${esc(devName)}</span>` : '';
 
@@ -386,6 +488,24 @@ const actions = {
     if (ok) toast('Pulando para a música escolhida');
   },
   lyrics: () => toggleLyrics(),
+  'track-menu': (d) => openTrackMenu(d),
+  'np-more': () => { const d = currentMenuData(); if (d) openTrackMenu(d, { fromPlayer: true }); },
+  'menu-item': async (d) => {
+    const it = menuItems[Number(d.i)];
+    if (!it) return;
+    closeMenu();
+    try { await it.run(); } catch (e) { toast(explain(e)); }
+  },
+  'lib-toggle': async (d, el) => {
+    const on = !!el.dataset.on;
+    try {
+      await (on ? S.libRemove([d.uri]) : S.libSave([d.uri]));
+      setSaveState(el, !on);
+    } catch (e) { toast(explain(e)); }
+  },
+  'top-range': (d) => setTopRange(d.range).then(() => { markLoadedImages($('#content')); highlightPlaying(); }),
+  'vol-down': () => changeVolume(-10),
+  'vol-up': () => changeVolume(10),
   'np-back': () => back(),
   toggle: () => togglePlay(),
   next: () => next(),
@@ -408,7 +528,7 @@ document.addEventListener('click', (e) => {
   if (!el || !activeRoot().contains(el)) return;
   activateAudio();
   if (el.hasAttribute('data-focus')) focus(el, { scroll: false });
-  Promise.resolve(actions[el.dataset.action]?.(el.dataset)).catch((err) => toast(explain(err)));
+  Promise.resolve(actions[el.dataset.action]?.(el.dataset, el)).catch((err) => toast(explain(err)));
 });
 
 // Mouse (teste no computador): passar por cima foca
@@ -478,7 +598,7 @@ document.addEventListener('keydown', (e) => {
 
 // Depois de 1 min parado com música tocando, abre a tela cheia (o Ambilight agradece)
 setInterval(() => {
-  if (started && P.state?.isPlaying && $('#np').hidden && $('#dialog').hidden && Date.now() - lastInput > 60_000) openNowPlaying();
+  if (started && P.state?.isPlaying && $('#np').hidden && $('#dialog').hidden && !menuOpen() && Date.now() - lastInput > 60_000) openNowPlaying();
   if (!$('#np').hidden) updateClock();
 }, 5000);
 
@@ -542,6 +662,7 @@ async function startApp() {
 
   bus.addEventListener('state', renderPlayer);
   bus.addEventListener('like', renderLike);
+  bus.addEventListener('queue', () => setTimeout(loadQueue, 600));
   bus.addEventListener('sdk', () => {
     if (P.sdkStatus === 'ready') toast(`Pronto! A TV aparece como “${DEVICE_NAME}” no Spotify.`);
     else if (P.sdkStatus !== 'loading') toast(`Tocar na TV indisponível: ${P.sdkMessage}. Ainda dá para controlar outros aparelhos.`, 7000);
@@ -556,6 +677,15 @@ async function startApp() {
   initSdk();
   startPolling();
   go('home', {}, { root: true });
+
+  // Recursos novos (podcasts, playlists, seguir) pedem permissões que o login antigo não tem
+  auth.missingScopes().then((missing) => {
+    if (!missing.length) return;
+    setTimeout(() => confirmDialog(
+      'O app ganhou podcasts, fila, playlists e mais. Entre de novo na sua conta para liberar esses recursos.',
+      'Entrar de novo', () => auth.logout(),
+    ), 1500);
+  });
 }
 
 window.addEventListener('spotv:logout', () => location.replace(location.pathname));

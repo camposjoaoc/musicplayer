@@ -25,14 +25,14 @@ const REPEAT = ['off', 'context', 'track'];
 
 function normTrack(item) {
   if (!item) return null;
-  const show = item.show;
+  const show = item.show || item.audiobook;
   return {
     id: item.id,
     uri: item.uri,
     name: item.name,
     type: item.type,
     duration: item.duration_ms || 0,
-    artists: item.artists?.length ? item.artists : show ? [{ name: show.publisher || show.name }] : [],
+    artists: item.artists?.length ? item.artists : show ? [{ name: show.publisher || show.authors?.[0]?.name || show.name }] : [],
     album: item.album || (show ? { name: show.name, uri: show.uri, images: item.images?.length ? item.images : show.images } : {}),
   };
 }
@@ -46,7 +46,10 @@ function fromApi(d) {
     at: performance.now(),
     shuffle: !!d.shuffle_state,
     repeat: d.repeat_state || 'off',
-    device: { id: d.device.id, name: d.device.name, type: d.device.type },
+    device: {
+      id: d.device.id, name: d.device.name, type: d.device.type,
+      volume: d.device.volume_percent, canVolume: d.device.supports_volume !== false && d.device.volume_percent != null,
+    },
     contextUri: d.context?.uri || null,
   };
 }
@@ -210,6 +213,7 @@ export function explain(e) {
       ? 'Nenhum dispositivo ativo. Escolha um em Dispositivos.'
       : 'O Spotify não liberou esse conteúdo para o app (playlists feitas pelo Spotify são bloqueadas para apps de desenvolvedores).';
   }
+  if (e?.status === 403 && /scope/i.test(e.message || '')) return 'Falta permissão: entre de novo na conta (Dispositivos → Sair da conta) para liberar este recurso.';
   if (e?.status === 403) return e.reason === 'PREMIUM_REQUIRED' ? 'Isso exige Spotify Premium.' : `O Spotify recusou a ação${e.reason ? ` (${e.reason})` : ''}.`;
   if (e?.status === 401) return 'Sessão expirada. Entre novamente.';
   return e?.message || 'Algo deu errado.';
@@ -291,6 +295,26 @@ export async function toggleLike() {
   } catch (e) {
     P.liked = was;
     emit('like');
+    toast(explain(e));
+  }
+}
+
+// Volume de outro aparelho (na TV quem manda é o controle remoto)
+export async function changeVolume(delta) {
+  const d = P.state?.device;
+  if (!d?.canVolume || d.id === P.deviceId) return;
+  const to = Math.max(0, Math.min(100, Math.round(((d.volume ?? 50) + delta) / 5) * 5));
+  P.state = { ...P.state, device: { ...d, volume: to } };
+  emit('state');
+  await guard(() => S.volume(to, d.id));
+}
+
+export async function addToQueue(uri) {
+  try {
+    await S.addToQueue(uri, activeId());
+    toast('Vai tocar em seguida');
+    emit('queue');
+  } catch (e) {
     toast(explain(e));
   }
 }

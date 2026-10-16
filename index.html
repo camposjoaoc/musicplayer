@@ -57,6 +57,7 @@
       <div class="nav-item" data-focus data-key="nav-home" data-action="nav" data-view="home"><span class="slot" data-icon="home" data-dual></span><span class="label">Início</span></div>
       <div class="nav-item" data-focus data-key="nav-search" data-action="nav" data-view="search"><span class="slot" data-icon="search" data-dual></span><span class="label">Buscar</span></div>
       <div class="nav-item" data-focus data-key="nav-library" data-action="nav" data-view="library"><span class="slot" data-icon="library" data-dual></span><span class="label">Biblioteca</span></div>
+      <div class="nav-item" data-focus data-key="nav-podcasts" data-action="nav" data-view="podcasts"><span class="slot" data-icon="podcast" data-dual></span><span class="label">Podcasts</span></div>
       <div class="nav-item" data-focus data-key="nav-np" data-action="now-playing"><span class="slot" data-icon="nowPlaying" data-dual></span><span class="label">Tocando agora</span></div>
       <div class="nav-item" data-focus data-key="nav-devices" data-action="nav" data-view="devices"><span class="slot" data-icon="speaker" data-dual></span><span class="label">Dispositivos</span></div>
 
@@ -116,8 +117,18 @@
           <div class="cbtn" id="np-like" data-focus data-key="np-like" data-action="like"></div>
         </div>
         <div class="np-actions">
-          <div class="cbtn pill" id="np-back-btn" data-focus data-key="np-back" data-action="np-back"><span class="pill-ic" data-icon="back"></span><span>Voltar</span></div>
-          <div class="cbtn pill" id="np-lyrics-btn" data-focus data-key="np-lyrics" data-action="lyrics"><span class="pill-ic" data-icon="lyrics"></span><span>Letra</span></div>
+          <div class="np-actions-left">
+            <div class="cbtn pill" id="np-back-btn" data-focus data-key="np-back" data-action="np-back"><span class="pill-ic" data-icon="back"></span><span>Voltar</span></div>
+          </div>
+          <div class="np-actions-right">
+            <div class="vol" id="np-vol" hidden>
+              <div class="cbtn" data-focus data-key="np-vol-down" data-action="vol-down" data-icon="volDown"></div>
+              <span id="np-vol-val" class="vol-val"></span>
+              <div class="cbtn" data-focus data-key="np-vol-up" data-action="vol-up" data-icon="volUp"></div>
+            </div>
+            <div class="cbtn pill" id="np-more-btn" data-focus data-key="np-more" data-action="np-more"><span class="pill-ic" data-icon="more"></span><span>Mais</span></div>
+            <div class="cbtn pill" id="np-lyrics-btn" data-focus data-key="np-lyrics" data-action="lyrics"><span class="pill-ic" data-icon="lyrics"></span><span>Letra</span></div>
+          </div>
         </div>
       </div>
       <aside class="np-queue" id="np-queue" data-zone data-exits="left" hidden>
@@ -131,6 +142,18 @@
     </div>
     <div class="np-hint">Na barra de progresso, ◀ ▶ volta/avança 10s · Voltar fecha</div>
   </section>
+
+  <!-- Menu de ações (⋯ das faixas, "Mais" do player) -->
+  <div id="menu" class="menu" hidden>
+    <div class="menu-panel">
+      <div class="menu-head">
+        <div class="eyebrow" id="menu-eyebrow"></div>
+        <div id="menu-title" class="menu-title"></div>
+        <div id="menu-sub" class="menu-sub"></div>
+      </div>
+      <div id="menu-items" class="menu-items view-scroll"></div>
+    </div>
+  </div>
 
   <div id="dialog" class="dialog" hidden>
     <div class="dialog-box">

@@ -28,4 +28,8 @@ export const SCOPES = [
   'playlist-read-private',
   'playlist-read-collaborative',
   'user-follow-read',
+  'user-follow-modify',
+  'user-read-playback-position',
+  'playlist-modify-public',
+  'playlist-modify-private',
 ];

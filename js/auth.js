@@ -47,6 +47,7 @@ function saveToken(data, prev) {
     access_token: data.access_token,
     refresh_token: data.refresh_token || prev?.refresh_token,
     expires_at: Date.now() + data.expires_in * 1000,
+    scope: data.scope || prev?.scope || '',
   };
   store.set(TOKEN_KEY, t);
   return t;
@@ -62,6 +63,15 @@ export async function exchangeCode(code, verifier) {
 }
 
 export const isLoggedIn = () => !!store.get(TOKEN_KEY)?.refresh_token;
+
+// Permissões que o app pede hoje e que o login atual não tem (o app ganhou recursos
+// novos depois que a pessoa entrou). Sessões antigas não guardavam o escopo: renova
+// o token uma vez para descobrir.
+export async function missingScopes() {
+  if (!store.get(TOKEN_KEY)?.scope) await getAccessToken(true).catch(() => {});
+  const granted = (store.get(TOKEN_KEY)?.scope || '').split(' ');
+  return SCOPES.filter((s) => !granted.includes(s));
+}
 
 export function logout(reason) {
   store.del(TOKEN_KEY);

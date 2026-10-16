@@ -1,7 +1,7 @@
 import { S } from './api.js';
 import { focus } from './nav.js';
 import { P, drmCheck, sdkLabel } from './player.js';
-import { artistsText, colorOf, esc, fmtTime, icon, pickImage, stripHtml } from './util.js';
+import { artistsText, colorOf, esc, fmtTime, icon, pickImage, store, stripHtml } from './util.js';
 
 // Listas de URIs para tocar quando não há um "contexto" Spotify (fallback)
 export const lists = new Map();
@@ -46,6 +46,16 @@ const artistCard = (a) => card({
   action: 'open', data: { type: 'artist', id: a.id },
 });
 
+const showCard = (sh) => card({
+  key: sh.uri, images: sh.images, title: sh.name, sub: sh.publisher || 'Podcast',
+  action: 'open', data: { type: 'show', id: sh.id },
+});
+
+const audiobookCard = (b) => card({
+  key: b.uri, images: b.images, title: b.name, sub: (b.authors || []).map((a) => a.name).join(', ') || 'Audiolivro',
+  action: 'open', data: { type: 'audiobook', id: b.id },
+});
+
 // Contexto de artista não aceita offset; nesse caso toca a partir do álbum.
 const contextFor = (t, ctx) => (ctx && !ctx.includes(':artist:') ? ctx : t.album?.uri);
 
@@ -68,11 +78,16 @@ const grid = (title, items) => (items.length
   ? `<section class="section"><h2>${esc(title)}</h2><div class="grid">${items.join('')}</div></section>`
   : '');
 
+// Botão "⋯" ao lado de cada faixa/episódio: abre o menu de ações (fila, playlist, curtir…)
+const idOf = (uri) => uri?.split(':')[2];
+const moreBtn = (key, d) => `<div class="track-more" data-focus data-key="m:${esc(key)}" data-action="track-menu"${dataAttrs(d)}>${icon('more')}</div>`;
+
 function trackList(tracks, { context, list, start = 0, showAlbum = true, showArt = true }) {
   return tracks.map((t, i) => {
     const ctx = typeof context === 'function' ? context(t) : context;
     const n = start + i;
-    return `<div class="track" data-focus data-key="t:${esc(t.uri)}:${n}" data-action="play-track"${dataAttrs({ uri: t.uri, context: ctx, list, index: list ? n : undefined })}>
+    const menu = { uri: t.uri, name: t.name, sub: artistsText(t.artists), album: t.album?.id, artist: t.artists?.[0]?.id, type: 'track' };
+    return `<div class="track-row"><div class="track" data-focus data-key="t:${esc(t.uri)}:${n}" data-action="play-track"${dataAttrs({ uri: t.uri, context: ctx, list, index: list ? n : undefined })}>
       <div class="track-num"><span>${n + 1}</span><span class="eq"><i></i><i></i><i></i></span></div>
       ${showArt ? `<div class="track-art">${art(t.album?.images, 64)}</div>` : ''}
       <div class="track-main">
@@ -81,8 +96,69 @@ function trackList(tracks, { context, list, start = 0, showAlbum = true, showArt
       </div>
       ${showAlbum ? `<div class="track-album">${esc(t.album?.name || '')}</div>` : ''}
       <div class="track-dur">${fmtTime(t.duration_ms)}</div>
-    </div>`;
+    </div>${moreBtn(`${t.uri}:${n}`, menu)}</div>`;
   }).join('');
+}
+
+// Episódios de podcast e capítulos de audiolivro
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(`${d}T12:00:00`);
+  if (Number.isNaN(dt.getTime())) return d;
+  const sameYear = dt.getFullYear() === new Date().getFullYear();
+  return dt.toLocaleDateString('pt-BR', sameYear ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function progressInfo(e) {
+  const rp = e.resume_point;
+  if (rp?.fully_played) return { label: 'Ouvido', frac: 1 };
+  if (rp?.resume_position_ms > 0 && e.duration_ms) {
+    const left = Math.max(1, Math.round((e.duration_ms - rp.resume_position_ms) / 60000));
+    return { label: `Faltam ${left} min`, frac: rp.resume_position_ms / e.duration_ms };
+  }
+  return null;
+}
+
+function episodeList(items, { context, showArt = true, chapters = false } = {}) {
+  return items.map((e, i) => {
+    const ctx = context || e.show?.uri;
+    const prog = progressInfo(e);
+    const meta = [
+      chapters ? `Capítulo ${e.chapter_number ?? i + 1}` : fmtDate(e.release_date),
+      `${Math.max(1, Math.round((e.duration_ms || 0) / 60000))} min`,
+      prog?.label,
+    ].filter(Boolean).join(' · ');
+    const menu = { uri: e.uri, name: e.name, sub: e.show?.name || '', show: e.show?.id, type: chapters ? 'chapter' : 'episode' };
+    return `<div class="track-row"><div class="track episode" data-focus data-key="e:${esc(e.uri)}" data-action="play-track"${dataAttrs({ uri: e.uri, context: ctx })}>
+      ${showArt ? `<div class="track-art">${art(e.images || e.show?.images, 64)}</div>` : `<div class="track-num"><span>${i + 1}</span><span class="eq"><i></i><i></i><i></i></span></div>`}
+      <div class="track-main">
+        <div class="track-title">${esc(e.name)}</div>
+        <div class="track-artist">${showArt && e.show?.name ? `${esc(e.show.name)} · ` : ''}${esc(meta)}</div>
+        ${prog && prog.frac < 1 ? `<div class="ep-progress"><i style="width:${Math.round(prog.frac * 100)}%"></i></div>` : ''}
+      </div>
+      <div class="track-dur">${fmtTime(e.duration_ms)}</div>
+    </div>${chapters ? '' : moreBtn(e.uri, menu)}</div>`;
+  }).join('');
+}
+
+// Salvar álbum / seguir playlist ou podcast / salvar audiolivro (biblioteca genérica)
+const SAVE_LABELS = { album: ['Salvar', 'Salvo'], playlist: ['Seguir', 'Seguindo'], show: ['Seguir', 'Seguindo'], audiobook: ['Salvar', 'Salvo'] };
+const saveButton = (uri, kind) =>
+  `<div class="btn save-btn" data-focus data-key="save" data-action="lib-toggle" data-uri="${esc(uri)}" data-kind="${kind}">${icon('plus')}<span>${SAVE_LABELS[kind][0]}</span></div>`;
+
+export function setSaveState(btn, on) {
+  btn.dataset.on = on ? '1' : '';
+  btn.classList.toggle('on', on);
+  btn.innerHTML = `${icon(on ? 'check' : 'plus')}<span>${SAVE_LABELS[btn.dataset.kind][on ? 1 : 0]}</span>`;
+}
+
+async function syncSaveButtons(root) {
+  const btns = [...root.querySelectorAll('.save-btn')];
+  if (!btns.length) return;
+  try {
+    const r = await S.libContains(btns.map((b) => b.dataset.uri));
+    btns.forEach((b, i) => setSaveState(b, !!r?.[i]));
+  } catch {}
 }
 
 const moreButton = () => '<div class="btn more" data-focus data-action="more">Carregar mais</div>';
@@ -141,15 +217,35 @@ function homeHero(track, context, isCurrent) {
   </section>`;
 }
 
+const RANGES = [['short_term', '4 semanas'], ['medium_term', '6 meses'], ['long_term', 'Sempre']];
+let topRange = store.get('spotv.topRange', 'short_term');
+
+const topsBody = (artists, tracks) =>
+  row('Artistas', (artists || []).map(artistCard)) + row('Músicas', (tracks || []).map((t) => trackCard(t)));
+
+const topsSection = (artists, tracks) => `<section class="tops">
+    <div class="tops-head"><h2>Seus favoritos</h2>
+      <div class="chips">${RANGES.map(([v, l]) => `<div class="chip${v === topRange ? ' on' : ''}" data-focus data-key="range-${v}" data-action="top-range" data-range="${v}">${l}</div>`).join('')}</div>
+    </div>
+    <div id="tops-body">${topsBody(artists, tracks)}</div>
+  </section>`;
+
+export async function setTopRange(range) {
+  topRange = range;
+  store.set('spotv.topRange', range);
+  document.querySelectorAll('.chip[data-range]').forEach((c) => c.classList.toggle('on', c.dataset.range === range));
+  const [a, t] = await Promise.allSettled([S.topArtists(range), S.topTracks(range)]);
+  const body = document.getElementById('tops-body');
+  if (body && topRange === range) body.innerHTML = topsBody(value(a)?.items, value(t)?.items);
+}
+
 async function home(el, { me, isStale }) {
-  const r = await Promise.allSettled([S.recent(), S.playlists(), S.topArtists(), S.topTracks(), S.savedAlbums()]);
+  const r = await Promise.allSettled([S.recent(), S.playlists(), S.topArtists(topRange), S.topTracks(topRange), S.savedAlbums()]);
   if (isStale()) return;
   const seen = new Set();
   const recentItems = (value(r[0])?.items || []).filter((i) => i.track && !seen.has(i.track.id) && seen.add(i.track.id));
   const recent = recentItems.map((i) => trackCard(i.track, i.context?.uri));
   const playlists = [likedCard(), ...(value(r[1])?.items || []).filter(Boolean).slice(0, 30).map(playlistCard)];
-  const artists = (value(r[2])?.items || []).map(artistCard);
-  const tops = (value(r[3])?.items || []).map((t) => trackCard(t));
   const albums = (value(r[4])?.items || []).map((i) => i.album).filter(Boolean).map(albumCard);
   const name = me?.display_name?.split(' ')[0];
 
@@ -162,8 +258,7 @@ async function home(el, { me, isStale }) {
     ${homeHero(heroTrack, heroCtx, !!current?.isPlaying)}
     ${row('Tocadas recentemente', recent)}
     ${row('Suas playlists', playlists)}
-    ${row('Seus artistas do momento', artists)}
-    ${row('Suas mais ouvidas', tops)}
+    ${topsSection(value(r[2])?.items, value(r[3])?.items)}
     ${row('Álbuns salvos', albums)}
   `);
   colorOf(pickImage(heroTrack?.album?.images, 64)).then((rgb) => {
@@ -171,16 +266,17 @@ async function home(el, { me, isStale }) {
   });
 }
 
+export async function allPlaylists() {
+  const out = [];
+  for (let offset = 0; offset < 200; offset += 50) {
+    const p = await S.playlists(offset);
+    out.push(...(p.items || []).filter(Boolean));
+    if (!p.next) break;
+  }
+  return out;
+}
+
 async function library(el, { isStale }) {
-  const allPlaylists = async () => {
-    const out = [];
-    for (let offset = 0; offset < 200; offset += 50) {
-      const p = await S.playlists(offset);
-      out.push(...(p.items || []).filter(Boolean));
-      if (!p.next) break;
-    }
-    return out;
-  };
   const r = await Promise.allSettled([allPlaylists(), S.savedAlbums(), S.followedArtists()]);
   if (isStale()) return;
   el.innerHTML = page(`
@@ -233,7 +329,7 @@ function blockedPlaylist(el, params) {
   `);
 }
 
-async function playlist(el, { params, isStale }) {
+async function playlist(el, { params, me, isStale }) {
   let p;
   try {
     p = await S.playlist(params.id);
@@ -261,10 +357,11 @@ async function playlist(el, { params, isStale }) {
     ${hero({
       images: p.images, eyebrow: 'Playlist', title: p.name, desc: stripHtml(p.description),
       meta: [p.owner?.display_name, total ? `${total} músicas` : ''],
-      actions: playButtons({ uri: p.uri, total }),
+      actions: playButtons({ uri: p.uri, total }) + (p.owner?.id && p.owner.id !== me?.id ? saveButton(p.uri, 'playlist') : ''),
     })}
     ${body}
   `);
+  syncSaveButtons(el);
 }
 
 async function album(el, { params, isStale }) {
@@ -272,15 +369,88 @@ async function album(el, { params, isStale }) {
   if (isStale()) return;
   const tracks = (a.tracks?.items || []).map((t) => ({ ...t, album: a }));
   const mainArtist = a.artists?.[0];
+  let offset = tracks.length;
+  moreFn = async () => {
+    const next = await S.albumTracks(a.id, offset);
+    const more = (next.items || []).map((t) => ({ ...t, album: a }));
+    const html = trackList(more, { context: a.uri, start: offset, showArt: false, showAlbum: false });
+    offset += more.length;
+    return { html, done: !next.next };
+  };
   el.innerHTML = page(`
     ${hero({
       images: a.images, eyebrow: a.album_type === 'single' ? 'Single' : 'Álbum', title: a.name,
       meta: [artistsText(a.artists), a.release_date?.slice(0, 4), `${a.total_tracks} músicas`],
-      actions: playButtons({ uri: a.uri, total: a.total_tracks })
+      actions: playButtons({ uri: a.uri, total: a.total_tracks }) + saveButton(a.uri, 'album')
         + (mainArtist ? `<div class="btn" data-focus data-action="open" data-type="artist" data-id="${esc(mainArtist.id)}">${icon('person')}<span>${esc(mainArtist.name)}</span></div>` : ''),
     })}
-    <div class="tracks">${trackList(tracks, { context: a.uri, showArt: false, showAlbum: false })}</div>
+    <div class="tracks">${trackList(tracks, { context: a.uri, showArt: false, showAlbum: false })}${a.tracks?.next ? moreButton() : ''}</div>
   `);
+  syncSaveButtons(el);
+}
+
+// ---- Podcasts e audiolivros ------------------------------------------------
+
+async function podcasts(el, { isStale }) {
+  const r = await Promise.allSettled([S.shows(), S.savedEpisodes(), S.audiobooks()]);
+  if (isStale()) return;
+  const shows = (value(r[0])?.items || []).map((i) => i.show).filter(Boolean);
+  const episodes = (value(r[1])?.items || []).map((i) => i.episode).filter(Boolean);
+  const books = (value(r[2])?.items || []).map((i) => i.audiobook || i).filter((b) => b?.id);
+  const empty = !shows.length && !episodes.length && !books.length;
+  el.innerHTML = page(`
+    <h1>Podcasts e audiolivros</h1>
+    ${row('Seus podcasts', shows.map(showCard))}
+    ${episodes.length ? `<section class="section"><h2>Episódios salvos</h2><div class="tracks">${episodeList(episodes)}</div></section>` : ''}
+    ${row('Seus audiolivros', books.map(audiobookCard))}
+    ${empty ? '<p class="note">Você ainda não segue nenhum podcast. Use a Busca para encontrar e seguir os seus favoritos.</p>' : ''}
+  `);
+}
+
+async function show(el, { params, isStale }) {
+  const sh = await S.show(params.id);
+  if (isStale()) return;
+  const eps = (sh.episodes?.items || []).filter(Boolean).map((e) => ({ ...e, show: sh }));
+  let offset = sh.episodes?.items?.length || 0;
+  moreFn = async () => {
+    const next = await S.showEpisodes(sh.id, offset);
+    const more = (next.items || []).filter(Boolean).map((e) => ({ ...e, show: sh }));
+    offset += next.items?.length || 0;
+    return { html: episodeList(more, { context: sh.uri, showArt: false }), done: !next.next };
+  };
+  const latest = eps[0];
+  el.innerHTML = page(`
+    ${hero({
+      images: sh.images, eyebrow: 'Podcast', title: sh.name, desc: stripHtml(sh.description),
+      meta: [sh.publisher, sh.total_episodes ? `${sh.total_episodes} episódios` : ''],
+      actions: (latest ? `<div class="btn primary" data-focus data-autofocus data-key="play" data-action="play-track"${dataAttrs({ uri: latest.uri, context: sh.uri })}>${icon('play')}<span>Episódio mais recente</span></div>` : '')
+        + saveButton(sh.uri, 'show'),
+    })}
+    <div class="tracks">${episodeList(eps, { context: sh.uri, showArt: false })}${sh.episodes?.next ? moreButton() : ''}</div>
+  `);
+  syncSaveButtons(el);
+}
+
+async function audiobook(el, { params, isStale }) {
+  const b = await S.audiobook(params.id);
+  if (isStale()) return;
+  const chapters = (b.chapters?.items || []).filter(Boolean);
+  let offset = chapters.length;
+  moreFn = async () => {
+    const next = await S.audiobookChapters(b.id, offset);
+    const more = (next.items || []).filter(Boolean);
+    offset += more.length;
+    return { html: episodeList(more, { context: b.uri, showArt: false, chapters: true }), done: !next.next };
+  };
+  el.innerHTML = page(`
+    ${hero({
+      images: b.images, eyebrow: 'Audiolivro', title: b.name, desc: stripHtml(b.description),
+      meta: [(b.authors || []).map((a) => a.name).join(', '), (b.narrators || []).length ? `Narração: ${b.narrators.map((n) => n.name).join(', ')}` : '', b.total_chapters ? `${b.total_chapters} capítulos` : ''],
+      actions: playButtons({ uri: b.uri, shuffle: false }) + saveButton(b.uri, 'audiobook'),
+    })}
+    <div class="tracks">${episodeList(chapters, { context: b.uri, showArt: false, chapters: true })}${b.chapters?.next ? moreButton() : ''}</div>
+  `);
+  syncSaveButtons(el);
 }
 
 async function artist(el, { params, isStale }) {
@@ -350,12 +520,16 @@ async function runSearch() {
   const q = query.trim();
   const seq = ++searchSeq;
   if (q.length < 2) {
-    out.innerHTML = '<div class="empty-state">Use o teclado ao lado para buscar músicas, artistas, álbuns e playlists.</div>';
+    out.innerHTML = '<div class="empty-state">Use o teclado ao lado para buscar músicas, artistas, álbuns, playlists, podcasts e audiolivros.</div>';
     return;
   }
   out.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
-    const r = await S.search(q);
+    // Em países sem audiolivros o tipo "audiobook" pode ser recusado: tenta sem ele
+    const r = await S.search(q).catch((e) => {
+      if (e.status === 400) return S.search(q, 'track,artist,album,playlist,show,episode');
+      throw e;
+    });
     if (seq !== searchSeq) return;
     const tracks = r.tracks?.items?.filter(Boolean) || [];
     const html = [
@@ -363,6 +537,10 @@ async function runSearch() {
       row('Artistas', (r.artists?.items || []).filter(Boolean).map(artistCard)),
       row('Álbuns', (r.albums?.items || []).filter(Boolean).map(albumCard)),
       row('Playlists', (r.playlists?.items || []).filter(Boolean).map(playlistCard)),
+      row('Podcasts', (r.shows?.items || []).filter(Boolean).map(showCard)),
+      (r.episodes?.items || []).filter(Boolean).length
+        ? `<section class="section"><h2>Episódios</h2><div class="tracks">${episodeList(r.episodes.items.filter(Boolean).slice(0, 5))}</div></section>` : '',
+      row('Audiolivros', (r.audiobooks?.items || []).filter(Boolean).map(audiobookCard)),
     ].join('');
     out.innerHTML = html || `<div class="empty-state">Nada encontrado para “${esc(q)}”.</div>`;
     out.scrollTop = 0;
@@ -422,7 +600,8 @@ export async function loadMore() {
     const nodes = [...tpl.content.children];
     btn.before(...nodes);
     if (done) btn.remove();
-    if (nodes[0]) focus(nodes[0]);
+    const first = nodes.map((n) => (n.matches('[data-focus]') ? n : n.querySelector('[data-focus]'))).find(Boolean);
+    if (first) focus(first);
   } finally {
     if (btn.isConnected) { delete btn.dataset.busy; btn.textContent = 'Carregar mais'; }
   }
@@ -444,6 +623,9 @@ const SKELETONS = {
   playlist: () => skHero() + skTracks(8),
   album: () => skHero() + skTracks(8),
   artist: () => skHero(true) + skTracks(5),
+  podcasts: () => `<div class="sk sk-h1"></div>${skRow()}${skTracks(5)}`,
+  show: () => skHero() + skTracks(8),
+  audiobook: () => skHero() + skTracks(8),
 };
 
 export function skeleton(name) {
@@ -451,4 +633,4 @@ export function skeleton(name) {
   return fn ? page(fn(), 'is-skeleton') : '<div class="view"><div class="loading"><div class="spinner"></div></div></div>';
 }
 
-export const views = { home, search, library, liked, playlist, album, artist, devices };
+export const views = { home, search, library, liked, playlist, album, artist, podcasts, show, audiobook, devices };
