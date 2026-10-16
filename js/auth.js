@@ -1,6 +1,6 @@
 // Login Spotify com Authorization Code + PKCE (sem client secret).
 // Duas formas: direto na TV (redirect) ou pareando pelo celular via QR code.
-import { CLIENT_ID, REDIRECT_URI, RELAY, SCOPES } from './config.js';
+import { APP_BASE, CLIENT_ID, REDIRECT_URI, RELAY, SCOPES } from './config.js';
 import { b64url, fromB64url, randomBytes, store } from './util.js';
 
 const AUTHORIZE = 'https://accounts.spotify.com/authorize';
@@ -53,11 +53,11 @@ function saveToken(data, prev) {
   return t;
 }
 
-export async function exchangeCode(code, verifier) {
+export async function exchangeCode(code, verifier, redirectUri = REDIRECT_URI) {
   saveToken(await tokenRequest({
     grant_type: 'authorization_code',
     code,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri,
     code_verifier: verifier,
   }));
 }
@@ -128,8 +128,7 @@ export async function startPairing({ onDone, onError }) {
   const rawKey = randomBytes(32);
   const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);
 
-  const url = new URL('pair.html', location.href);
-  url.search = '';
+  const url = new URL('pair.html', APP_BASE);
   url.hash = [topic, b64url(rawKey), challenge].join('.');
 
   const since = Math.floor(Date.now() / 1000) - 5;
@@ -139,19 +138,22 @@ export async function startPairing({ onDone, onError }) {
   es.onmessage = async (ev) => {
     if (done) return;
     let code;
+    let redirectUri;
     try {
       const msg = JSON.parse(ev.data);
       if (msg.event && msg.event !== 'message') return;
       const [iv, ct] = String(msg.message).split('.');
       const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64url(iv) }, key, fromB64url(ct));
-      code = JSON.parse(new TextDecoder().decode(plain)).code;
+      ({ code, redirect_uri: redirectUri } = JSON.parse(new TextDecoder().decode(plain)));
     } catch {
       return; // mensagem que não é nossa
     }
     done = true;
     es.close();
     try {
-      await exchangeCode(code, verifier);
+      // A troca tem que usar o mesmo endereço de retorno que o celular usou no login
+      const ok = typeof redirectUri === 'string' && /^https:\/\/[^/]+\/(.*\/)?callback\.html$/.test(redirectUri);
+      await exchangeCode(code, verifier, ok ? redirectUri : REDIRECT_URI);
       onDone();
     } catch (e) {
       onError(e);

@@ -642,7 +642,10 @@ async function showLogin(error) {
   try {
     const pairing = await auth.startPairing({
       onDone: () => { $('#pair-status').textContent = 'Conectado! Abrindo…'; location.replace(location.pathname); },
-      onError: (e) => { $('#pair-status').textContent = `Falhou: ${e.message}. Recarregando…`; setTimeout(() => location.reload(), 3000); },
+      onError: (e) => {
+        $('#pair-status').textContent = `Falhou (${e.status || 'erro'}${e.code ? ` ${e.code}` : ''}): ${e.message}. Gerando um novo código em 15 s…`;
+        setTimeout(() => location.reload(), 15000);
+      },
     });
     renderQr($('#qr'), pairing.url);
   } catch (e) {

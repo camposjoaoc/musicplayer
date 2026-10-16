@@ -8,7 +8,10 @@ export const DEVICE_NAME = 'Philips TV';
 // É calculado a partir de onde o app está hospedado, ex.:
 //   https://SEU-USUARIO.github.io/spotify-tv/callback.html
 //   http://127.0.0.1:5173/callback.html   (teste local)
-export const REDIRECT_URI = new URL('callback.html', location.href).href.split('?')[0];
+// Calculado a partir deste arquivo (js/config.js), não da barra de endereço: navegadores de TV
+// podem mostrar a URL sem a "/" final ou com parâmetros extras, e o Spotify exige o endereço exato.
+export const APP_BASE = new URL('../', import.meta.url).href;
+export const REDIRECT_URI = new URL('callback.html', APP_BASE).href;
 
 // Relay público usado só no login pelo celular. A mensagem vai criptografada
 // (AES-GCM) com uma chave que existe apenas no QR code.
