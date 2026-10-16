@@ -82,7 +82,16 @@ const grid = (title, items) => (items.length
 const idOf = (uri) => uri?.split(':')[2];
 const moreBtn = (key, d) => `<div class="track-more" data-focus data-key="m:${esc(key)}" data-action="track-menu"${dataAttrs(d)}>${icon('more')}</div>`;
 
-function trackList(tracks, { context, list, start = 0, showAlbum = true, showArt = true }) {
+// `popularity` (0–100) e `followers` estão marcados como descontinuados na API:
+// só aparecem enquanto o Spotify continuar mandando.
+const popMeter = (p) => (typeof p === 'number'
+  ? `<span class="pop" title="Popularidade ${p}/100"><i style="width:${Math.max(4, Math.min(100, p))}%"></i></span>` : '');
+
+const compact = new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });
+const followersText = (f) => (typeof f?.total === 'number' && f.total > 0
+  ? `${compact.format(f.total)} ${f.total === 1 ? 'seguidor' : 'de seguidores'}` : '');
+
+function trackList(tracks, { context, list, start = 0, showAlbum = true, showArt = true, showPop = false }) {
   return tracks.map((t, i) => {
     const ctx = typeof context === 'function' ? context(t) : context;
     const n = start + i;
@@ -92,7 +101,7 @@ function trackList(tracks, { context, list, start = 0, showAlbum = true, showArt
       ${showArt ? `<div class="track-art">${art(t.album?.images, 64)}</div>` : ''}
       <div class="track-main">
         <div class="track-title">${esc(t.name)}</div>
-        <div class="track-artist">${t.explicit ? '<span class="explicit">E</span>' : ''}${esc(artistsText(t.artists))}</div>
+        <div class="track-artist">${t.explicit ? '<span class="explicit">E</span>' : ''}${esc(artistsText(t.artists))}${showPop ? popMeter(t.popularity) : ''}</div>
       </div>
       ${showAlbum ? `<div class="track-album">${esc(t.album?.name || '')}</div>` : ''}
       <div class="track-dur">${fmtTime(t.duration_ms)}</div>
@@ -479,10 +488,10 @@ async function artist(el, { params, isStale }) {
   el.innerHTML = page(`
     ${hero({
       images: a.images, round: true, eyebrow: 'Artista', title: a.name,
-      meta: [(a.genres || []).slice(0, 3).join(', ')],
+      meta: [followersText(a.followers), (a.genres || []).slice(0, 3).join(', ')],
       actions: playButtons({ uri: a.uri, shuffle: false }),
     })}
-    ${songs.length ? `<section class="section"><h2>Populares</h2><div class="tracks">${trackList(songs, { context: (t) => t.album?.uri })}</div></section>` : ''}
+    ${songs.length ? `<section class="section"><h2>Populares</h2><div class="tracks">${trackList(songs, { context: (t) => t.album?.uri, showPop: true })}</div></section>` : ''}
     ${row('Álbuns', newestFirst(albumsR.ok ? albumsR.v : []).map(albumCard))}
     ${row('Singles e EPs', newestFirst(singlesR.ok ? singlesR.v : []).map(albumCard))}
     ${row('Aparece em', newestFirst(appearsR.ok ? appearsR.v : []).map(albumCard))}
@@ -550,7 +559,7 @@ async function runSearch() {
     if (seq !== searchSeq) return;
     const tracks = r.tracks?.items?.filter(Boolean) || [];
     const html = [
-      tracks.length ? `<section class="section"><h2>Músicas</h2><div class="tracks">${trackList(tracks, { context: (t) => t.album?.uri, showAlbum: false })}</div></section>` : '',
+      tracks.length ? `<section class="section"><h2>Músicas</h2><div class="tracks">${trackList(tracks, { context: (t) => t.album?.uri, showAlbum: false, showPop: true })}</div></section>` : '',
       row('Artistas', (r.artists?.items || []).filter(Boolean).map(artistCard)),
       row('Álbuns', (r.albums?.items || []).filter(Boolean).map(albumCard)),
       row('Playlists', (r.playlists?.items || []).filter(Boolean).map(playlistCard)),

@@ -279,6 +279,10 @@ img.broken { visibility: hidden; }
 .track-title { font-size: 1.45rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .track-artist, .track-album { font-size: 1.2rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .track-dur { font-size: 1.25rem; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.pop { display: inline-block; width: 4rem; height: 0.35rem; margin-left: 1rem; vertical-align: 0.2em; border-radius: 1rem; background: rgba(255,255,255,0.15); overflow: hidden; }
+.pop i { display: block; height: 100%; border-radius: 1rem; background: var(--muted); }
+.track.is-focused .pop { background: rgba(0,0,0,0.15); }
+.track.is-focused .pop i { background: #333; }
 .explicit { display: inline-block; font-size: 0.8rem; font-weight: 800; background: var(--muted); color: #000; border-radius: 0.2rem; padding: 0 0.35rem; margin-right: 0.5rem; vertical-align: 0.15em; }
 .track.is-focused { background: var(--focus); color: #000; transform: scale(1.01); }
 .track.is-focused .track-num, .track.is-focused .track-artist, .track.is-focused .track-album, .track.is-focused .track-dur { color: #333; }
