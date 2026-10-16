@@ -310,6 +310,7 @@ function renderPlayer() {
   $('#np-title').textContent = t?.name || 'Nada tocando';
   $('#np-artist').textContent = t ? artistsText(t.artists) : '';
   $('#np-album').textContent = t?.album?.name || '';
+  $('#np-album').hidden = !t?.album?.name;
   setImg($('#mini-art'), pickImage(t?.album?.images, 64));
   setImg($('#np-art'), pickImage(t?.album?.images, 640));
   setImg($('#np-bg-art'), pickImage(t?.album?.images, 300));
@@ -507,6 +508,14 @@ const actions = {
   'vol-down': () => changeVolume(-10),
   'vol-up': () => changeVolume(10),
   'np-back': () => back(),
+  // Nome do artista/álbum no player leva à página (em podcasts, à página do programa)
+  'np-goto': (d) => {
+    const m = currentMenuData();
+    if (!m) return;
+    const id = d.target === 'artist' ? m.artist : m.album;
+    if (id) goFrom(d.target, id);
+    else if (m.show) goFrom('show', m.show);
+  },
   toggle: () => togglePlay(),
   next: () => next(),
   prev: () => prev(),
