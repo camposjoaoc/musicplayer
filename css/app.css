@@ -89,6 +89,7 @@ h2 { font-size: 1.9rem; font-weight: 700; }
 .qr-note { padding: 1.5rem; color: var(--muted); font-size: 1.3rem; }
 .steps { margin: 0; padding-left: 1.8rem; text-align: left; color: var(--muted); font-size: 1.35rem; }
 .login-error { color: #ff8a8a; font-size: 1.5rem; }
+.login-diag { max-width: 90rem; color: var(--faint); font-size: 1.1rem; text-align: center; word-break: break-all; }
 .setup h1 { font-size: 2.6rem; }
 .setup-steps { max-width: 70rem; font-size: 1.6rem; line-height: 1.6; color: var(--muted); }
 .setup-steps b { color: var(--text); }

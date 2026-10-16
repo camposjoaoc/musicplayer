@@ -26,23 +26,30 @@ export function authorizeUrl({ challenge, state }) {
   return `${AUTHORIZE}?${p}`;
 }
 
-async function tokenRequest(params) {
-  const res = await fetch(TOKEN, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: CLIENT_ID, ...params }),
-  });
-  const data = await res.json().catch(() => ({}));
+export async function tokenRequest(params) {
+  let res;
+  try {
+    res = await fetch(TOKEN, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: CLIENT_ID, ...params }).toString(),
+    });
+  } catch (e) {
+    throw Object.assign(new Error(`falha de rede ao pedir o token (${e.message})`), { status: 0 });
+  }
+  const text = await res.text().catch((e) => `[corpo ilegível: ${e.message}]`);
+  let data = {};
+  try { data = JSON.parse(text); } catch {}
   if (!res.ok) {
-    const err = new Error(data.error_description || data.error || `HTTP ${res.status}`);
-    err.code = data.error;
-    err.status = res.status;
-    throw err;
+    // Sem o JSON de erro do Spotify, mostra o começo da resposta para diagnosticar
+    const detail = data.error_description || data.error
+      || `HTTP ${res.status} · ${res.headers.get('content-type') || 'sem content-type'} · ${text.slice(0, 120) || 'corpo vazio'}`;
+    throw Object.assign(new Error(detail), { code: data.error, status: res.status });
   }
   return data;
 }
 
-function saveToken(data, prev) {
+export function saveToken(data, prev) {
   const t = {
     access_token: data.access_token,
     refresh_token: data.refresh_token || prev?.refresh_token,
@@ -117,19 +124,26 @@ export async function completeTvLogin() {
 }
 
 // ---- Pareamento pelo celular ---------------------------------------------
-// A TV gera verifier + chave AES. O QR leva só o challenge, o tópico e a chave.
-// O celular faz login, cifra o authorization code e publica no relay; a TV
-// decifra e troca o code pelo token (o verifier nunca sai da TV).
+// A TV gera um par de chaves ECDH (P-256) e mostra só a pública no QR, junto com um
+// tópico do relay. O celular faz o login E a troca do código pelo token (o navegador do
+// celular é mais completo que o da TV), cifra os tokens com uma chave derivada da
+// pública da TV e publica no relay. Só a TV, com a chave privada, consegue decifrar —
+// quem fotografar o QR não consegue ler os tokens.
+
+const ECDH = { name: 'ECDH', namedCurve: 'P-256' };
+
+export async function pairingKey(peerPublicRaw, myPrivateKey, usage) {
+  const peer = await crypto.subtle.importKey('raw', peerPublicRaw, ECDH, false, []);
+  return crypto.subtle.deriveKey({ name: 'ECDH', public: peer }, myPrivateKey, { name: 'AES-GCM', length: 256 }, false, [usage]);
+}
 
 export async function startPairing({ onDone, onError }) {
-  const verifier = b64url(randomBytes(48));
-  const challenge = await challengeFor(verifier);
   const topic = 'spotv-' + b64url(randomBytes(16));
-  const rawKey = randomBytes(32);
-  const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);
+  const keys = await crypto.subtle.generateKey(ECDH, false, ['deriveKey']);
+  const pub = new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey));
 
   const url = new URL('pair.html', APP_BASE);
-  url.hash = [topic, b64url(rawKey), challenge].join('.');
+  url.hash = `${topic}.${b64url(pub)}`;
 
   const since = Math.floor(Date.now() / 1000) - 5;
   const es = new EventSource(`${RELAY}/${topic}/sse?since=${since}`);
@@ -137,27 +151,23 @@ export async function startPairing({ onDone, onError }) {
 
   es.onmessage = async (ev) => {
     if (done) return;
-    let code;
-    let redirectUri;
+    let payload;
     try {
       const msg = JSON.parse(ev.data);
       if (msg.event && msg.event !== 'message') return;
-      const [iv, ct] = String(msg.message).split('.');
+      const [phonePub, iv, ct] = String(msg.message).split('.');
+      const key = await pairingKey(fromB64url(phonePub), keys.privateKey, 'decrypt');
       const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64url(iv) }, key, fromB64url(ct));
-      ({ code, redirect_uri: redirectUri } = JSON.parse(new TextDecoder().decode(plain)));
+      payload = JSON.parse(new TextDecoder().decode(plain));
     } catch {
       return; // mensagem que não é nossa
     }
     done = true;
     es.close();
-    try {
-      // A troca tem que usar o mesmo endereço de retorno que o celular usou no login
-      const ok = typeof redirectUri === 'string' && /^https:\/\/[^/]+\/(.*\/)?callback\.html$/.test(redirectUri);
-      await exchangeCode(code, verifier, ok ? redirectUri : REDIRECT_URI);
-      onDone();
-    } catch (e) {
-      onError(e);
-    }
+    if (payload.error) { onError(new Error(payload.error)); return; }
+    if (!payload.refresh_token) { onError(new Error('o celular não mandou o token')); return; }
+    saveToken(payload);
+    onDone();
   };
 
   return {
