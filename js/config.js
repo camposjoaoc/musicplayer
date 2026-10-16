@@ -12,7 +12,7 @@ export const REDIRECT_URI = new URL('callback.html', location.href).href.split('
 
 // Opcional: chave da YouTube Data API v3 para o botão "Clipe" (veja o README).
 // Restrinja a chave ao seu domínio no Google Cloud — ela fica visível no código.
-export const YOUTUBE_API_KEY = '';
+export const YOUTUBE_API_KEY = 'AIzaSyD8xewY_Zsag34xGnIKWdCY_ozeew7TA9Y';
 
 // Relay público usado só no login pelo celular. A mensagem vai criptografada
 // (AES-GCM) com uma chave que existe apenas no QR code.
