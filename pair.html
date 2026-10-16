@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Conectar TV</title>
+  <link rel="stylesheet" href="css/phone.css">
+</head>
+<body>
+  <main id="msg" class="phone">
+    <h1>Conectando a TV…</h1>
+    <p>Você vai para a página de login do Spotify.</p>
+    <a id="go" class="phone-btn" href="#">Entrar com Spotify</a>
+  </main>
+  <script type="module">
+    import { startPair } from './js/phone.js';
+    startPair();
+  </script>
+</body>
+</html>
