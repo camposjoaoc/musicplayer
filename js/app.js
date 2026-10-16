@@ -114,27 +114,27 @@ function closeNowPlaying() {
 }
 
 // ---- Letra -------------------------------------------------------------
+// Modo da tela "Tocando agora": a letra ocupa o lugar da fila, na altura da capa.
 
 let lyrics = null;
 let lyricsUri = null;
 let lyricsActive = -2;
-let lyricsOffset = 0;
 const lyricsOpen = () => !$('#np-lyrics').hidden;
 
-function openLyrics() {
+function toggleLyrics() {
+  if (lyricsOpen()) return closeLyrics();
   if (!P.state?.track) { toast('Nada tocando.'); return; }
   openNowPlaying();
-  if (lyricsOpen()) return;
   $('#np').classList.add('lyrics-open');
   $('#np-lyrics').hidden = false;
-  pushLayer($('#np-lyrics'));
+  $('#np-lyrics-btn').classList.add('on');
   loadLyrics();
 }
 
 function closeLyrics() {
   $('#np').classList.remove('lyrics-open');
   $('#np-lyrics').hidden = true;
-  popLayer($('#np-lyrics'));
+  $('#np-lyrics-btn').classList.remove('on');
 }
 
 async function loadLyrics() {
@@ -143,12 +143,8 @@ async function loadLyrics() {
   lyricsUri = t?.uri || null;
   lyrics = null;
   lyricsActive = -2;
-  lyricsOffset = 0;
   box.style.transform = '';
   box.classList.remove('is-plain');
-  $('#lyr-title').textContent = t?.name || '';
-  $('#lyr-artist').textContent = t ? artistsText(t.artists) : '';
-  setImg($('#lyr-art'), pickImage(t?.album?.images, 300));
   if (!t) { box.innerHTML = '<p class="lyr-msg">Nada tocando.</p>'; return; }
   box.innerHTML = '<p class="lyr-msg">Procurando a letra…</p>';
   try {
@@ -160,9 +156,6 @@ async function loadLyrics() {
       lyrics = l;
       box.innerHTML = renderLines(l);
       box.classList.toggle('is-plain', !l.synced);
-      $('#lyr-hint').textContent = l.synced
-        ? 'OK pausa · ◀ ▶ 10s · Voltar fecha a letra'
-        : 'Letra sem sincronia: ▲ ▼ rolam · OK pausa · Voltar fecha a letra';
       lyricsTick(true);
     }
   } catch {
@@ -170,30 +163,28 @@ async function loadLyrics() {
   }
 }
 
-// Destaca a linha que está tocando e a mantém a ~40% da altura
+// Sincronizada: destaca a linha atual e a mantém a ~40% da altura.
+// Sem sincronia: rola o texto proporcionalmente ao andamento da música.
 function lyricsTick(force = false) {
-  if (!lyrics?.synced || !lyricsOpen()) return;
+  if (!lyrics || !lyricsOpen()) return;
+  const box = $('#lyr-lines');
+  const h = $('#lyr-scroll').clientHeight;
+  if (lyrics.plain) {
+    const dur = P.state?.track?.duration || 0;
+    const frac = dur ? Math.min(1, position() / dur) : 0;
+    box.style.transform = `translateY(${-Math.round(Math.max(0, box.scrollHeight - h * 0.7) * frac)}px)`;
+    return;
+  }
   const i = activeIndex(lyrics.synced, position());
   if (i === lyricsActive && !force) return;
   lyricsActive = i;
-  const lines = [...$('#lyr-lines').children];
+  const lines = [...box.children];
   lines.forEach((el, k) => {
     el.classList.toggle('active', k === i);
     el.classList.toggle('past', k < i);
   });
   const cur = lines[Math.max(i, 0)];
-  if (!cur) return;
-  const h = $('#lyr-scroll').clientHeight;
-  $('#lyr-lines').style.transform = `translateY(${Math.round(h * 0.4 - (cur.offsetTop + cur.offsetHeight / 2))}px)`;
-}
-
-// Letras sem sincronia: ▲ ▼ rolam
-function lyricsScroll(dir) {
-  if (!lyrics?.plain) return;
-  const h = $('#lyr-scroll').clientHeight;
-  const max = Math.max(0, $('#lyr-lines').scrollHeight - h * 0.6);
-  lyricsOffset = Math.min(max, Math.max(0, lyricsOffset + dir * h * 0.35));
-  $('#lyr-lines').style.transform = `translateY(${-lyricsOffset}px)`;
+  if (cur) box.style.transform = `translateY(${Math.round(h * 0.4 - (cur.offsetTop + cur.offsetHeight / 2))}px)`;
 }
 
 function setImg(img, url) {
@@ -328,7 +319,6 @@ function tick() {
   const frac = dur ? Math.min(1, pos / dur) : 0;
   $('#mini-bar').style.transform = `scaleX(${frac})`;
   $('#np-bar').style.transform = `scaleX(${frac})`;
-  $('#lyr-bar').style.transform = `scaleX(${frac})`;
   $('#mini-pos').textContent = $('#np-pos').textContent = fmtTime(pos);
   $('#mini-dur').textContent = $('#np-dur').textContent = fmtTime(dur);
 }
@@ -395,7 +385,7 @@ const actions = {
       : { list: 'queue', index: i });
     if (ok) toast('Pulando para a música escolhida');
   },
-  lyrics: () => openLyrics(),
+  lyrics: () => toggleLyrics(),
   toggle: () => togglePlay(),
   next: () => next(),
   prev: () => prev(),
@@ -465,7 +455,6 @@ document.addEventListener('keydown', (e) => {
       return;
     case 'up':
     case 'down':
-      if (lyricsOpen()) { lyricsScroll(k === 'up' ? -1 : 1); return; }
       move(k, { smooth: !e.repeat });
       return;
     case 'enter':
