@@ -415,7 +415,7 @@ img.broken { visibility: hidden; }
 .np.lyrics-open .np-queue, .np.lyrics-open .np-hint, .np.lyrics-open .np-album { display: none; }
 .np.lyrics-open .np-info {
   grid-area: info; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  grid-template-areas: "text text text" "progress progress progress" ". controls actions";
+  grid-template-areas: "text text text" "progress progress progress" "back controls actions";
   align-items: center; column-gap: 2rem; row-gap: 0.2rem;
 }
 .np.lyrics-open .np-text { grid-area: text; flex-direction: row; align-items: baseline; gap: 1.2rem; min-width: 0; }
@@ -423,7 +423,10 @@ img.broken { visibility: hidden; }
 .np.lyrics-open .np-artist { font-size: 1.6rem; color: rgba(255,255,255,0.75); }
 .np.lyrics-open .np-progress { grid-area: progress; margin-top: 0.6rem; }
 .np.lyrics-open .np-controls { grid-area: controls; margin-top: 0.2rem; }
-.np.lyrics-open .np-actions { grid-area: actions; justify-self: end; margin-top: 0; }
+/* No modo letra, Voltar e Letra viram itens da grade: um em cada ponta da linha dos controles */
+.np.lyrics-open .np-actions { display: contents; }
+.np.lyrics-open #np-back-btn { grid-area: back; justify-self: start; }
+.np.lyrics-open #np-lyrics-btn { grid-area: actions; justify-self: end; }
 .cbtn.pill.on { background: var(--accent); color: var(--accent-ink); }
 .cbtn.pill.on.is-focused { background: #3be477; box-shadow: 0 0 0 0.25rem var(--focus); }
 

@@ -386,6 +386,7 @@ const actions = {
     if (ok) toast('Pulando para a música escolhida');
   },
   lyrics: () => toggleLyrics(),
+  'np-back': () => back(),
   toggle: () => togglePlay(),
   next: () => next(),
   prev: () => prev(),
