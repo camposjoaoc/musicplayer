@@ -205,7 +205,11 @@ const isLocal = () => !!(P.sdk && P.deviceId && P.state?.device?.id === P.device
 const activeId = () => P.state?.device?.id;
 
 export function explain(e) {
-  if (e?.status === 404) return 'Nenhum dispositivo ativo. Escolha um em Dispositivos.';
+  if (e?.status === 404) {
+    return e.reason === 'NO_ACTIVE_DEVICE' || /device/i.test(e.message || '')
+      ? 'Nenhum dispositivo ativo. Escolha um em Dispositivos.'
+      : 'O Spotify não liberou esse conteúdo para o app (playlists feitas pelo Spotify são bloqueadas para apps de desenvolvedores).';
+  }
   if (e?.status === 403) return e.reason === 'PREMIUM_REQUIRED' ? 'Isso exige Spotify Premium.' : `O Spotify recusou a ação${e.reason ? ` (${e.reason})` : ''}.`;
   if (e?.status === 401) return 'Sessão expirada. Entre novamente.';
   return e?.message || 'Algo deu errado.';

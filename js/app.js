@@ -284,7 +284,7 @@ const numberOrUndef = (v) => (v === undefined || v === '' ? undefined : Number(v
 
 const actions = {
   nav: (d) => nav(d.view),
-  open: (d) => go(d.type, { id: d.id }),
+  open: ({ type, id, name, img, owner }) => go(type, { id, name, img, owner }),
   retry: () => render(),
   'now-playing': () => openNowPlaying(),
   'play-context': async (d) => {

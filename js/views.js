@@ -30,7 +30,9 @@ function card({ key, images, title, sub, action, data = {}, round = false, kind 
 const playlistCard = (p) => card({
   key: p.uri, images: p.images, title: p.name,
   sub: p.owner?.display_name ? `De ${p.owner.display_name}` : 'Playlist',
-  action: 'open', data: { type: 'playlist', id: p.id },
+  action: 'open',
+  // nome/capa vão junto: se a API recusar os detalhes, a página ainda abre
+  data: { type: 'playlist', id: p.id, name: p.name, img: pickImage(p.images, 640), owner: p.owner?.display_name },
 });
 
 const albumCard = (a) => card({
@@ -216,8 +218,30 @@ async function liked(el, { me, isStale }) {
   `);
 }
 
+// Playlists do próprio Spotify (Daily Mix, Descobertas da Semana, editoriais…) não são
+// liberadas pela API para apps criados depois de nov/2024: mostramos o que veio do card
+// e deixamos tocar pelo contexto, que é resolvido pelo player.
+function blockedPlaylist(el, params) {
+  const uri = `spotify:playlist:${params.id}`;
+  el.innerHTML = page(`
+    ${hero({
+      images: params.img ? [{ url: params.img, width: 640 }] : [],
+      eyebrow: 'Playlist', title: params.name || 'Playlist', meta: [params.owner],
+      actions: playButtons({ uri }),
+    })}
+    <p class="note">O Spotify não libera os detalhes das playlists feitas por ele (Daily Mix, Descobertas da Semana, “This Is”, editoriais) para apps de desenvolvedores. Tente tocar mesmo assim pelos botões acima.</p>
+  `);
+}
+
 async function playlist(el, { params, isStale }) {
-  const p = await S.playlist(params.id);
+  let p;
+  try {
+    p = await S.playlist(params.id);
+  } catch (e) {
+    if (isStale()) return;
+    if (e.status === 404 || e.status === 403) return blockedPlaylist(el, params);
+    throw e;
+  }
   if (isStale()) return;
   const pg = p.items || p.tracks;
   const tracks = playlistTracks(pg);
