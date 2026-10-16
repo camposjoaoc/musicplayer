@@ -373,6 +373,8 @@ img.broken { visibility: hidden; }
 .np-bg-art {
   position: absolute; left: -10%; top: -10%; width: 120%; height: 120%; object-fit: cover;
   filter: blur(5rem) saturate(1.6); opacity: 0.55; transition: opacity 600ms ease;
+  /* Camada própria: o desfoque é calculado uma vez por capa, não a cada quadro da barra/letra */
+  will-change: transform; transform: translateZ(0);
 }
 .np-bg {
   position: absolute; inset: 0;

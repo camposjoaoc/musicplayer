@@ -96,22 +96,28 @@ export function position() {
 
 let pollTimer;
 let lastSdkAt = 0;
+let pollSeq = 0;
 
 export async function refresh() {
+  // Vários refresh podem estar em voo (polling + refreshSoon): só o mais recente vale,
+  // senão uma resposta atrasada sobrescreve um estado mais novo.
+  const seq = ++pollSeq;
   try {
     const d = await S.state();
+    if (seq !== pollSeq) return;
     // Enquanto a TV toca, o SDK é mais preciso que a API (que atrasa um pouco)
     if (d?.device?.id && d.device.id === P.deviceId && performance.now() - lastSdkAt < 4000) return;
     setState(fromApi(d));
   } catch {}
 }
 
-function schedule(ms = 5000) {
+// Tocando: 5 s (progresso e troca de faixa); pausado ou parado: 12 s (economiza rede e CPU)
+function schedule() {
   clearTimeout(pollTimer);
   pollTimer = setTimeout(async () => {
     if (!document.hidden) await refresh();
     schedule();
-  }, ms);
+  }, P.state?.isPlaying ? 5000 : 12000);
 }
 
 export function startPolling() {
@@ -208,6 +214,8 @@ const isLocal = () => !!(P.sdk && P.deviceId && P.state?.device?.id === P.device
 const activeId = () => P.state?.device?.id;
 
 export function explain(e) {
+  // fetch rejeita com TypeError quando não há rede (mensagem em inglês do navegador)
+  if (e?.name === 'TypeError' && /fetch|network|load/i.test(e.message || '')) return 'Sem conexão com o Spotify. Verifique a internet da TV.';
   if (e?.status === 404) {
     return e.reason === 'NO_ACTIVE_DEVICE' || /device/i.test(e.message || '')
       ? 'Nenhum dispositivo ativo. Escolha um em Dispositivos.'
@@ -222,9 +230,11 @@ export function explain(e) {
 async function guard(fn) {
   try {
     await fn();
+    return true;
   } catch (e) {
     toast(explain(e));
     refresh();
+    return false;
   }
 }
 
@@ -260,7 +270,8 @@ export async function prev() {
 export async function seekBy(delta) {
   const s = P.state;
   if (!s?.track) return;
-  const to = Math.max(0, Math.min(position() + delta, s.track.duration - 1000));
+  const dur = s.track.duration;
+  const to = Math.max(0, dur ? Math.min(position() + delta, dur - 1000) : position() + delta);
   optimistic({ position: to });
   if (isLocal()) return guard(() => P.sdk.seek(to));
   await guard(() => S.seek(to));
@@ -330,16 +341,26 @@ export async function play({ contextUri, uris, offsetUri, offsetIndex, shuffle }
   else if (uris) body.uris = uris;
   if (offsetUri) body.offset = { uri: offsetUri };
   else if (Number.isInteger(offsetIndex)) body.offset = { position: offsetIndex };
-  await S.play(body, device);
-  if (shuffle !== undefined) S.shuffle(shuffle, device).catch(() => {});
+  let used = device;
+  try {
+    await S.play(body, device);
+  } catch (e) {
+    // O aparelho escolhido em "Dispositivos" pode ter saído do ar: esquece e tenta de novo
+    if (e.status !== 404 || !P.preferredDeviceId) throw e;
+    P.preferredDeviceId = null;
+    used = targetDevice();
+    if (!used || used === device) throw e;
+    await S.play(body, used);
+  }
+  if (shuffle !== undefined) S.shuffle(shuffle, used).catch(() => {});
   refreshSoon();
 }
 
 export async function transfer(id) {
   const target = id === 'local' ? P.deviceId : id;
   if (!target) { toast(sdkLabel()); return; }
+  if (!(await guard(() => S.transfer(target, !!P.state?.isPlaying)))) return;
   P.preferredDeviceId = id === 'local' ? null : id;
-  await guard(() => S.transfer(target, !!P.state?.isPlaying));
   toast('Reprodução transferida');
   refreshSoon();
 }

@@ -39,11 +39,14 @@ export async function tokenRequest(params) {
   }
   const text = await res.text().catch((e) => `[corpo ilegível: ${e.message}]`);
   let data = {};
-  try { data = JSON.parse(text); } catch {}
-  if (!res.ok) {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object') data = parsed;
+  } catch {}
+  if (!res.ok || !data.access_token) {
     // Sem o JSON de erro do Spotify, mostra o começo da resposta para diagnosticar
     const detail = data.error_description || data.error
-      || `HTTP ${res.status} · ${res.headers.get('content-type') || 'sem content-type'} · ${text.slice(0, 120) || 'corpo vazio'}`;
+      || `HTTP ${res.status}${res.ok ? ' sem access_token' : ''} · ${res.headers.get('content-type') || 'sem content-type'} · ${text.slice(0, 120) || 'corpo vazio'}`;
     throw Object.assign(new Error(detail), { code: data.error, status: res.status });
   }
   return data;
@@ -137,7 +140,7 @@ export async function pairingKey(peerPublicRaw, myPrivateKey, usage) {
   return crypto.subtle.deriveKey({ name: 'ECDH', public: peer }, myPrivateKey, { name: 'AES-GCM', length: 256 }, false, [usage]);
 }
 
-export async function startPairing({ onDone, onError }) {
+export async function startPairing({ onDone, onError, onStatus = () => {} }) {
   const topic = 'spotv-' + b64url(randomBytes(16));
   const keys = await crypto.subtle.generateKey(ECDH, false, ['deriveKey']);
   const pub = new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey));
@@ -148,6 +151,10 @@ export async function startPairing({ onDone, onError }) {
   const since = Math.floor(Date.now() / 1000) - 5;
   const es = new EventSource(`${RELAY}/${topic}/sse?since=${since}`);
   let done = false;
+  // O EventSource reconecta sozinho; avisa se o relay ficar fora do ar por um tempo
+  let failures = 0;
+  es.onopen = () => { if (failures) onStatus('Aguardando o celular…'); failures = 0; };
+  es.onerror = () => { if (!done && ++failures === 3) onStatus('Sem conexão com o servidor de pareamento. Tentando de novo… (ou use “Entrar aqui”)'); };
 
   es.onmessage = async (ev) => {
     if (done) return;

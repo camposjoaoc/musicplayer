@@ -151,7 +151,8 @@ async function openTrackMenu(d, { fromPlayer = false } = {}) {
   if (d.album) items.push({ icon: 'album', label: 'Ir para o álbum', run: () => goFrom('album', d.album) });
   if (d.artist) items.push({ icon: 'person', label: 'Ir para o artista', run: () => goFrom('artist', d.artist) });
   if (d.show) items.push({ icon: 'podcast', label: 'Ir para o podcast', run: () => goFrom('show', d.show) });
-  openMenu({ eyebrow: kind === 'episode' ? 'Episódio' : 'Música', title: d.name, sub: d.sub, items });
+  if (d.audiobook) items.push({ icon: 'book', label: 'Ir para o audiolivro', run: () => goFrom('audiobook', d.audiobook) });
+  openMenu({ eyebrow: { episode: 'Episódio', chapter: 'Capítulo' }[kind] || 'Música', title: d.name, sub: d.sub, items });
 }
 
 let editablePlaylists = null;
@@ -182,12 +183,15 @@ async function openPlaylistPicker(d) {
 function currentMenuData() {
   const t = P.state?.track;
   if (!t) return null;
-  const episode = t.type === 'episode';
+  const id = (uri) => uri?.split(':')[2];
+  // Em episódios e capítulos, o "álbum" normalizado é o podcast/audiolivro
+  const type = t.type === 'episode' || t.type === 'chapter' ? t.type : 'track';
   return {
-    uri: t.uri, name: t.name, sub: artistsText(t.artists), type: episode ? 'episode' : t.type === 'chapter' ? 'chapter' : 'track',
-    album: !episode ? t.album?.uri?.split(':')[2] : undefined,
-    artist: !episode ? t.artists?.[0]?.uri?.split(':')[2] : undefined,
-    show: episode ? t.album?.uri?.split(':')[2] : undefined,
+    uri: t.uri, name: t.name, sub: artistsText(t.artists), type,
+    album: type === 'track' ? id(t.album?.uri) : undefined,
+    artist: type === 'track' ? id(t.artists?.[0]?.uri) : undefined,
+    show: type === 'episode' ? id(t.album?.uri) : undefined,
+    audiobook: type === 'chapter' ? id(t.album?.uri) : undefined,
   };
 }
 
@@ -201,6 +205,7 @@ function openNowPlaying() {
   updateClock();
   renderPlayer();
   loadQueue();
+  tick(true);
 }
 
 function closeNowPlaying() {
@@ -215,6 +220,7 @@ function closeNowPlaying() {
 let lyrics = null;
 let lyricsUri = null;
 let lyricsActive = -2;
+let lyricsTimer;
 const lyricsOpen = () => !$('#np-lyrics').hidden;
 
 function toggleLyrics() {
@@ -224,10 +230,13 @@ function toggleLyrics() {
   $('#np').classList.add('lyrics-open');
   $('#np-lyrics').hidden = false;
   $('#np-lyrics-btn').classList.add('on');
+  clearInterval(lyricsTimer);
+  lyricsTimer = setInterval(lyricsTick, 200);
   loadLyrics();
 }
 
 function closeLyrics() {
+  clearInterval(lyricsTimer);
   $('#np').classList.remove('lyrics-open');
   $('#np-lyrics').hidden = true;
   $('#np-lyrics-btn').classList.remove('on');
@@ -283,6 +292,14 @@ function lyricsTick(force = false) {
   if (cur) box.style.transform = `translateY(${Math.round(h * 0.4 - (cur.offsetTop + cur.offsetHeight / 2))}px)`;
 }
 
+// Escreve no DOM só quando o valor muda (o estado chega a cada poucos segundos)
+const domCache = new Map();
+function setHTML(sel, html) {
+  if (domCache.get(sel) === html) return;
+  domCache.set(sel, html);
+  $(sel).innerHTML = html;
+}
+
 function setImg(img, url) {
   if (img.dataset.src === url) return;
   img.dataset.src = url;
@@ -328,11 +345,11 @@ function renderPlayer() {
   }
 
   const playIcon = icon(s?.isPlaying ? 'pause' : 'play');
-  $('#mini-toggle').innerHTML = playIcon;
-  $('#np-toggle').innerHTML = playIcon;
+  setHTML('#mini-toggle', playIcon);
+  setHTML('#np-toggle', playIcon);
   $('#np-shuffle').classList.toggle('on', !!s?.shuffle);
   $('#np-repeat').classList.toggle('on', !!s && s.repeat !== 'off');
-  $('#np-repeat').innerHTML = icon(s?.repeat === 'track' ? 'repeatOne' : 'repeat');
+  setHTML('#np-repeat', icon(s?.repeat === 'track' ? 'repeatOne' : 'repeat'));
 
   $('#np-lyrics-btn').hidden = !t || t.type === 'episode' || t.type === 'chapter';
   if ($('#np-lyrics-btn').hidden && lyricsOpen()) closeLyrics();
@@ -342,12 +359,14 @@ function renderPlayer() {
   const remoteVol = !!dev?.canVolume && dev.id !== P.deviceId;
   $('#np-vol').hidden = !remoteVol;
   if (remoteVol) $('#np-vol-val').textContent = `${dev.volume}%`;
-  $('#mini-device').innerHTML = dev ? `${icon(deviceIcon(dev.type))}<span>${esc(devName)}</span>` : '';
-  $('#np-device').innerHTML = dev ? `${icon(deviceIcon(dev.type))}<span>${s.isPlaying ? 'Tocando' : 'Pausado'} em ${esc(devName)}</span>` : '';
+  setHTML('#mini-device', dev ? `${icon(deviceIcon(dev.type))}<span>${esc(devName)}</span>` : '');
+  setHTML('#np-device', dev ? `${icon(deviceIcon(dev.type))}<span>${s.isPlaying ? 'Tocando' : 'Pausado'} em ${esc(devName)}</span>` : '');
 
   updateColor(t);
-  highlightPlaying();
-  tick();
+  // Destacar o que toca percorre todas as faixas/cards da tela: só quando algo mudou
+  const hl = `${t?.uri}|${s?.contextUri}|${!!s?.isPlaying}`;
+  if (hl !== lastHighlight) highlightPlaying();
+  tick(true);
 }
 
 function renderLike() {
@@ -357,7 +376,9 @@ function renderLike() {
   b.classList.toggle('disabled', P.liked === null);
 }
 
+let lastHighlight = '';
 function highlightPlaying() {
+  lastHighlight = `${P.state?.track?.uri}|${P.state?.contextUri}|${!!P.state?.isPlaying}`;
   const uri = P.state?.track?.uri;
   const ctxUri = P.state?.contextUri || '';
   const playing = !!P.state?.isPlaying;
@@ -416,14 +437,19 @@ document.addEventListener('focuschange', (e) => {
   $('#app').classList.toggle('nav-open', !!$('#sidebar')?.contains(e.detail));
 });
 
-function tick() {
+// Atualiza barras e tempos (a cada 500 ms). Pausado, nada muda: não toca no DOM.
+function tick(force = false) {
+  if (!force && !P.state?.isPlaying) return;
   const dur = P.state?.track?.duration || 0;
   const pos = position();
   const frac = dur ? Math.min(1, pos / dur) : 0;
   $('#mini-bar').style.transform = `scaleX(${frac})`;
+  $('#mini-pos').textContent = fmtTime(pos);
+  $('#mini-dur').textContent = fmtTime(dur);
+  if ($('#np').hidden) return;
   $('#np-bar').style.transform = `scaleX(${frac})`;
-  $('#mini-pos').textContent = $('#np-pos').textContent = fmtTime(pos);
-  $('#mini-dur').textContent = $('#np-dur').textContent = fmtTime(dur);
+  $('#np-pos').textContent = fmtTime(pos);
+  $('#np-dur').textContent = fmtTime(dur);
 }
 
 // ---- Ações (OK do controle = click) ------------------------------------
@@ -515,6 +541,7 @@ const actions = {
     const id = d.target === 'artist' ? m.artist : m.album;
     if (id) goFrom(d.target, id);
     else if (m.show) goFrom('show', m.show);
+    else if (m.audiobook) goFrom('audiobook', m.audiobook);
   },
   toggle: () => togglePlay(),
   next: () => next(),
@@ -576,6 +603,9 @@ document.addEventListener('keydown', (e) => {
   if (!k) return;
   e.preventDefault();
 
+  // Segurar a tecla só repete as setas; OK, Voltar e mídia disparariam várias vezes
+  if (e.repeat && !['left', 'right', 'up', 'down'].includes(k)) return;
+
   const f = getFocused();
   switch (k) {
     case 'left':
@@ -598,7 +628,10 @@ document.addEventListener('keydown', (e) => {
     case 'playpause': togglePlay(); return;
     case 'next': next(); return;
     case 'prev': prev(); return;
-    case 'red': if ($('#np').hidden) openNowPlaying(); else closeNowPlaying(); return;
+    case 'red':
+      if (!$('#dialog').hidden || menuOpen()) return;
+      if ($('#np').hidden) openNowPlaying(); else closeNowPlaying();
+      return;
     case 'green': nav('search'); return;
     case 'yellow': nav('library'); return;
     case 'blue': nav('devices'); return;
@@ -641,6 +674,7 @@ async function showLogin(error) {
   }
   try {
     const pairing = await auth.startPairing({
+      onStatus: (msg) => { $('#pair-status').textContent = msg; },
       onDone: () => { $('#pair-status').textContent = 'Conectado! Abrindo…'; location.replace(location.pathname); },
       onError: (e) => {
         $('#pair-status').textContent = `Falhou${e.status ? ` (${e.status}${e.code ? ` ${e.code}` : ''})` : ''}: ${e.message}. Novo código em 30 s…`;
@@ -685,7 +719,6 @@ async function startApp() {
   renderPlayer();
   renderLike();
   setInterval(tick, 500);
-  setInterval(lyricsTick, 200);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 
   initSdk();

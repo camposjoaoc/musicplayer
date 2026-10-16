@@ -68,6 +68,8 @@ export function getLyrics(track) {
   if (!cache.has(track.uri)) {
     const p = lookup(track).catch((e) => { cache.delete(track.uri); throw e; });
     cache.set(track.uri, p);
+    // Guarda só as últimas 100 músicas (Map mantém a ordem de inserção)
+    if (cache.size > 100) cache.delete(cache.keys().next().value);
   }
   return cache.get(track.uri);
 }

@@ -3,7 +3,9 @@ import { LANG_HEADER, sleep } from './util.js';
 
 const BASE = 'https://api.spotify.com/v1';
 
-export async function api(path, { method = 'GET', query, body, retry = true } = {}) {
+// retry: renova o token uma vez após 401; retryRate: espera e tenta de novo uma vez após 429.
+// São independentes: um 429 seguido de 401 (token venceu durante a espera) ainda renova.
+export async function api(path, { method = 'GET', query, body, retry = true, retryRate = true } = {}) {
   const url = new URL(BASE + path);
   if (query) {
     for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== null) url.searchParams.set(k, v);
@@ -17,12 +19,12 @@ export async function api(path, { method = 'GET', query, body, retry = true } = 
 
   if (retry && res.status === 401) {
     await getAccessToken(true);
-    return api(path, { method, query, body, retry: false });
+    return api(path, { method, query, body, retry: false, retryRate });
   }
-  if (retry && res.status === 429) {
+  if (retryRate && res.status === 429) {
     const wait = Number(res.headers.get('Retry-After')) || 2;
     await sleep(Math.min(wait, 10) * 1000);
-    return api(path, { method, query, body, retry: false });
+    return api(path, { method, query, body, retry, retryRate: false });
   }
 
   const text = await res.text();
