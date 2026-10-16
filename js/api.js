@@ -53,7 +53,8 @@ export const S = {
   album: (id) => api(`/albums/${id}`),
   albumTracks: (id, offset = 0) => api(`/albums/${id}/tracks`, { query: { limit: 50, offset } }),
   artist: (id) => api(`/artists/${id}`),
-  artistAlbums: (id) => api(`/artists/${id}/albums`, { query: { include_groups: 'album,single', limit: 30 } }),
+  // Máximo de 10 por página desde fev/2026
+  artistAlbums: (id, group, offset = 0) => api(`/artists/${id}/albums`, { query: { include_groups: group, limit: 10, offset } }),
   playlist: (id) => api(`/playlists/${id}`),
   playlistItems: (id, offset = 0) => api(`/playlists/${id}/items`, { query: { limit: 50, offset } }),
   addToPlaylist: (id, uris) => api(`/playlists/${id}/items`, { method: 'POST', body: { uris } }),

@@ -453,14 +453,29 @@ async function audiobook(el, { params, isStale }) {
   syncSaveButtons(el);
 }
 
+// Junta até `max` páginas de 10 (limite do endpoint de álbuns do artista)
+async function pagesOf(fetchPage, max = 3) {
+  const out = [];
+  for (let i = 0; i < max; i++) {
+    const p = await fetchPage(i * 10);
+    out.push(...(p.items || []).filter(Boolean));
+    if (!p.next) break;
+  }
+  return out;
+}
+
+const newestFirst = (list) => [...list].sort((x, y) => (y.release_date || '').localeCompare(x.release_date || ''));
+
 async function artist(el, { params, isStale }) {
-  const [a, albums] = await Promise.all([S.artist(params.id), S.artistAlbums(params.id).catch(() => null)]);
+  const groups = ['album', 'single', 'appears_on'].map((g) => pagesOf((offset) => S.artistAlbums(params.id, g, offset)));
+  const [a, ...albumResults] = await Promise.all([S.artist(params.id), ...groups.map((p) => p.then((v) => ({ ok: true, v }), (e) => ({ ok: false, e })))]);
   // "Top tracks" saiu da API em 2026; a busca por artista devolve as mais populares.
   const songs = await S.search(`artist:"${a.name}"`, 'track')
     .then((r) => r.tracks.items.filter((t) => t.artists.some((x) => x.id === a.id)))
     .catch(() => []);
   if (isStale()) return;
-  const items = albums?.items || [];
+  const [albumsR, singlesR, appearsR] = albumResults;
+  const failed = albumResults.every((r) => !r.ok);
   el.innerHTML = page(`
     ${hero({
       images: a.images, round: true, eyebrow: 'Artista', title: a.name,
@@ -468,8 +483,10 @@ async function artist(el, { params, isStale }) {
       actions: playButtons({ uri: a.uri, shuffle: false }),
     })}
     ${songs.length ? `<section class="section"><h2>Populares</h2><div class="tracks">${trackList(songs, { context: (t) => t.album?.uri })}</div></section>` : ''}
-    ${row('Álbuns', items.filter((x) => x.album_type === 'album').map(albumCard))}
-    ${row('Singles e EPs', items.filter((x) => x.album_type !== 'album').map(albumCard))}
+    ${row('Álbuns', newestFirst(albumsR.ok ? albumsR.v : []).map(albumCard))}
+    ${row('Singles e EPs', newestFirst(singlesR.ok ? singlesR.v : []).map(albumCard))}
+    ${row('Aparece em', newestFirst(appearsR.ok ? appearsR.v : []).map(albumCard))}
+    ${failed ? `<p class="note">Não foi possível carregar os álbuns: ${esc(albumResults[0].e?.message || 'erro')}.</p>` : ''}
   `);
 }
 
