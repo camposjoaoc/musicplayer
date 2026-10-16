@@ -83,7 +83,11 @@ o Spotify retoma de onde parou; se o clipe terminar, pula para a próxima músic
 3. Restrinja a chave (ela fica pública no código):
    - **Restrições de aplicativo:** *Referenciadores HTTP* → `https://camposjoaoc.github.io/*` e `http://127.0.0.1:5173/*`
    - **Restrições de API:** só *YouTube Data API v3*
-4. Cole em `YOUTUBE_API_KEY` no [js/config.js](js/config.js) e publique.
+4. **Não coloque a chave no código** (o repositório é público). Em vez disso, abra o app uma vez
+   com a chave na URL — ela fica guardada só naquele aparelho e some da barra de endereço:
+   - Na TV: cadastre no Sandbox do DevView a URL `https://camposjoaoc.github.io/spotify-tv/?yt=SUA_CHAVE`
+   - No computador: `http://127.0.0.1:5173/?yt=SUA_CHAVE`
+   - Para apagar a chave de um aparelho: abra com `?yt=` vazio.
 
 A cota grátis (10.000 unidades/dia) dá ~100 buscas por dia; cada música é buscada uma vez só
 (o resultado fica guardado na TV).

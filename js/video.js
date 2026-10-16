@@ -3,7 +3,22 @@
 import { YOUTUBE_API_KEY } from './config.js';
 import { artistsText, store, toast } from './util.js';
 
-export const videoEnabled = () => !!YOUTUBE_API_KEY;
+// A chave chega uma vez pela URL (?yt=...), fica no armazenamento do aparelho e sai da URL
+// na hora, para não aparecer no histórico nem ser repassada adiante.
+const KEY_STORE = 'spotv.ytkey';
+(function captureKey() {
+  const q = new URLSearchParams(location.search);
+  const k = q.get('yt');
+  if (k === null) return;
+  if (/^AIza[0-9A-Za-z_-]{35}$/.test(k)) store.set(KEY_STORE, k);
+  else if (k === '') store.del(KEY_STORE); // ?yt= vazio apaga a chave guardada
+  q.delete('yt');
+  const rest = q.toString();
+  history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+})();
+
+const apiKey = () => YOUTUBE_API_KEY || store.get(KEY_STORE, '');
+export const videoEnabled = () => !!apiKey();
 
 const CACHE_KEY = 'spotv.clips';
 let apiReady = null;
@@ -53,7 +68,7 @@ async function findClips(track) {
   const url = new URL('https://www.googleapis.com/youtube/v3/search');
   url.search = new URLSearchParams({
     part: 'snippet', type: 'video', videoEmbeddable: 'true', maxResults: '6',
-    q: `${artist} ${track.name} official video`, key: YOUTUBE_API_KEY,
+    q: `${artist} ${track.name} official video`, key: apiKey(),
   });
   const res = await fetch(url);
   const data = await res.json().catch(() => ({}));
