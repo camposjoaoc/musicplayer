@@ -368,18 +368,10 @@ img.broken { visibility: hidden; }
 .np-progress.is-focused .bar { height: 0.9rem; }
 .np-times { display: flex; justify-content: space-between; margin-top: 0.6rem; font-size: 1.3rem; color: rgba(255,255,255,0.75); font-variant-numeric: tabular-nums; }
 .np-controls { display: flex; align-items: center; gap: 1.6rem; margin-top: 1.2rem; }
-.np-actions { display: flex; gap: 1rem; margin-top: 1.4rem; }
-.np-actions:not(:has(:not([hidden]))) { display: none; }
 .np-controls .cbtn { width: 5rem; height: 5rem; }
 .np-controls .cbtn .ic { width: 2.8rem; height: 2.8rem; }
 .np-controls .cbtn.main { width: 7rem; height: 7rem; }
 .np-controls .cbtn.main .ic { width: 3.6rem; height: 3.6rem; }
-.cbtn.pill {
-  width: auto; height: 4.2rem; display: flex; gap: 0.6rem; padding: 0 1.6rem 0 1.3rem; border-radius: 999px;
-  background: rgba(255,255,255,0.12); font-size: 1.3rem; font-weight: 700;
-}
-.cbtn.pill .ic { width: 2.2rem; height: 2.2rem; }
-.cbtn.pill.is-focused { background: var(--focus); color: #000; }
 .np-queue {
   width: 27rem; flex: none; align-self: center; display: flex; flex-direction: column; gap: 0.9rem;
   padding: 1.6rem; border-radius: 1.2rem; background: rgba(0,0,0,0.28);
@@ -393,20 +385,6 @@ img.broken { visibility: hidden; }
 .q-item.is-focused { background: var(--focus); color: #000; transform: scale(1.03); }
 .q-item.is-focused .q-artist { color: #333; }
 .np-hint { position: absolute; bottom: 2.5rem; left: 0; right: 0; text-align: center; font-size: 1.15rem; color: rgba(255,255,255,0.45); }
-
-/* ---- Clipe (YouTube) ---- */
-.video { position: fixed; inset: 0; z-index: 70; background: #000; }
-.yt-player, .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.video-focus { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-.video-loading { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; }
-.video-hud {
-  position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; pointer-events: none;
-  padding: 8rem 6rem 4rem; background: linear-gradient(transparent, rgba(0,0,0,0.85));
-  opacity: 0; transition: opacity 300ms ease;
-}
-.video-hud.show { opacity: 1; }
-.video-title { font-size: 2.6rem; font-weight: 800; margin: 0.4rem 0 0.6rem; }
-.video-hint { font-size: 1.2rem; color: rgba(255,255,255,0.7); }
 
 /* ---- Diálogo e toast ---- */
 .dialog { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: rgba(0,0,0,0.72); }

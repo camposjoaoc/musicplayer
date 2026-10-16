@@ -12,7 +12,6 @@ hospedagem **HTTPS** (o DRM Widevine só funciona em contexto seguro) e acesso a
 | Peça | O que faz |
 |---|---|
 | `index.html` + `js/app.js` | App da TV: menu lateral recolhível, Início (com "Continuar ouvindo"), Busca (teclado na tela), Biblioteca, Tocando agora (fila "A seguir", relógio, capa desfocada ao fundo), Dispositivos |
-| `js/video.js` | Clipes via YouTube (opcional) |
 | `js/player.js` | Web Playback SDK (toca na TV) + Web API `/me/player` (controla qualquer dispositivo) |
 | `js/nav.js` | Navegação espacial pelas setas do controle |
 | `js/auth.js` | Login PKCE (sem segredo) — direto na TV ou pareando pelo celular via QR |
@@ -71,26 +70,6 @@ O Client ID não é segredo (PKCE não usa client secret), então o repositório
 No DevView, ligue **Enable Debug Mode**. No Chrome do computador (mesma rede), abra
 `chrome://inspect/devices` → **Configure** → adicione `IP_DA_TV:9222` (ou `:7001`) e clique em *inspect*.
 A tela **Dispositivos → Diagnóstico** do app mostra o status do player, do Widevine e o user agent.
-
-## 5. (Opcional) Clipes pelo YouTube
-
-O Spotify não libera vídeos na API pública, então o botão **Clipe** (tela "Tocando agora")
-busca o clipe oficial no YouTube, pausa o Spotify e toca em tela cheia. Ao fechar com Voltar,
-o Spotify retoma de onde parou; se o clipe terminar, pula para a próxima música.
-
-1. Em <https://console.cloud.google.com/>, crie um projeto e ative a **YouTube Data API v3**.
-2. Em **Credenciais → Criar credenciais → Chave de API**.
-3. Restrinja a chave (ela fica pública no código):
-   - **Restrições de aplicativo:** *Referenciadores HTTP* → `https://camposjoaoc.github.io/*` e `http://127.0.0.1:5173/*`
-   - **Restrições de API:** só *YouTube Data API v3*
-4. **Não coloque a chave no código** (o repositório é público). Em vez disso, abra o app uma vez
-   com a chave na URL — ela fica guardada só naquele aparelho e some da barra de endereço:
-   - Na TV: cadastre no Sandbox do DevView a URL `https://camposjoaoc.github.io/spotify-tv/?yt=SUA_CHAVE`
-   - No computador: `http://127.0.0.1:5173/?yt=SUA_CHAVE`
-   - Para apagar a chave de um aparelho: abra com `?yt=` vazio.
-
-A cota grátis (10.000 unidades/dia) dá ~100 buscas por dia; cada música é buscada uma vez só
-(o resultado fica guardado na TV).
 
 ## Limitações conhecidas
 

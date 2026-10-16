@@ -7,7 +7,6 @@ import {
   seekBy, startPolling, toggleLike, togglePlay, toggleShuffle, transfer,
 } from './player.js';
 import { $, artistsText, colorOf, esc, fmtTime, icon, pickImage, store, toast } from './util.js';
-import { closeVideo, isVideoOpen, openVideo, videoEnabled, videoKey } from './video.js';
 import { deviceIcon, lists, loadMore, searchKey, skeleton, views } from './views.js';
 
 const ctx = { me: null };
@@ -56,7 +55,6 @@ async function render({ restore = false } = {}) {
 
 function back() {
   if (!$('#dialog').hidden) return closeDialog();
-  if (isVideoOpen()) return closeVideo();
   if (!$('#np').hidden) return closeNowPlaying();
   if (stack.length > 1) {
     stack.pop();
@@ -72,7 +70,6 @@ function back() {
 function nav(view) {
   if (!started) return;
   if (!$('#dialog').hidden) closeDialog();
-  if (isVideoOpen()) closeVideo();
   if (!$('#np').hidden) closeNowPlaying();
   go(view, {}, { root: true });
 }
@@ -142,7 +139,6 @@ function renderPlayer() {
   setImg($('#mini-art'), pickImage(t?.album?.images, 64));
   setImg($('#np-art'), pickImage(t?.album?.images, 640));
   setImg($('#np-bg-art'), pickImage(t?.album?.images, 300));
-  $('#np-clip').hidden = !videoEnabled() || !t;
 
   // Troca de faixa: anima a capa e o texto e atualiza a fila
   if ((t?.uri || '') !== lastTrackUri) {
@@ -310,26 +306,6 @@ const actions = {
       : { list: 'queue', index: i });
     if (ok) toast('Pulando para a música escolhida');
   },
-  clip: () => {
-    const wasPlaying = !!P.state?.isPlaying;
-    openVideo(P.state?.track, {
-      onOpen: () => {
-        if (wasPlaying) togglePlay();
-        pushLayer($('#video'));
-      },
-      onClosed: ({ ended }) => {
-        popLayer($('#video'));
-        if (!wasPlaying) return;
-        if (ended) {
-          next();
-          setTimeout(() => { if (!P.state?.isPlaying) togglePlay(); }, 1500);
-        } else {
-          togglePlay();
-        }
-      },
-    });
-  },
-  'video-toggle': () => videoKey('enter'),
   toggle: () => togglePlay(),
   next: () => next(),
   prev: () => prev(),
@@ -389,7 +365,6 @@ document.addEventListener('keydown', (e) => {
   const k = e.key === ' ' ? 'playpause' : KEYS[e.keyCode];
   if (!k) return;
   e.preventDefault();
-  if (videoKey(k)) return;
 
   const f = getFocused();
   switch (k) {
@@ -422,7 +397,7 @@ document.addEventListener('keydown', (e) => {
 
 // Depois de 1 min parado com música tocando, abre a tela cheia (o Ambilight agradece)
 setInterval(() => {
-  if (started && P.state?.isPlaying && $('#np').hidden && $('#dialog').hidden && !isVideoOpen() && Date.now() - lastInput > 60_000) openNowPlaying();
+  if (started && P.state?.isPlaying && $('#np').hidden && $('#dialog').hidden && Date.now() - lastInput > 60_000) openNowPlaying();
   if (!$('#np').hidden) updateClock();
 }, 5000);
 
@@ -502,6 +477,10 @@ async function startApp() {
 }
 
 window.addEventListener('spotv:logout', () => location.replace(location.pathname));
+
+// Limpa a chave do YouTube e o cache de clipes de versões anteriores do app
+store.del('spotv.ytkey');
+store.del('spotv.clips');
 
 async function boot() {
   if (!CLIENT_ID) return showSetup();
