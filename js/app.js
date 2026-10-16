@@ -7,6 +7,7 @@ import {
   seekBy, startPolling, toggleLike, togglePlay, toggleShuffle, transfer,
 } from './player.js';
 import { $, artistsText, colorOf, esc, fmtTime, hydrateIcons, icon, pickImage, store, toast } from './util.js';
+import { activeIndex, getLyrics, renderLines } from './lyrics.js';
 import { deviceIcon, lists, loadMore, searchKey, skeleton, views } from './views.js';
 
 const ctx = { me: null };
@@ -55,6 +56,7 @@ async function render({ restore = false } = {}) {
 
 function back() {
   if (!$('#dialog').hidden) return closeDialog();
+  if (lyricsOpen()) return closeLyrics();
   if (!$('#np').hidden) return closeNowPlaying();
   if (stack.length > 1) {
     stack.pop();
@@ -70,6 +72,7 @@ function back() {
 function nav(view) {
   if (!started) return;
   if (!$('#dialog').hidden) closeDialog();
+  if (lyricsOpen()) closeLyrics();
   if (!$('#np').hidden) closeNowPlaying();
   go(view, {}, { root: true });
 }
@@ -105,8 +108,92 @@ function openNowPlaying() {
 }
 
 function closeNowPlaying() {
+  if (lyricsOpen()) closeLyrics();
   $('#np').hidden = true;
   popLayer($('#np'));
+}
+
+// ---- Letra -------------------------------------------------------------
+
+let lyrics = null;
+let lyricsUri = null;
+let lyricsActive = -2;
+let lyricsOffset = 0;
+const lyricsOpen = () => !$('#np-lyrics').hidden;
+
+function openLyrics() {
+  if (!P.state?.track) { toast('Nada tocando.'); return; }
+  openNowPlaying();
+  if (lyricsOpen()) return;
+  $('#np').classList.add('lyrics-open');
+  $('#np-lyrics').hidden = false;
+  pushLayer($('#np-lyrics'));
+  loadLyrics();
+}
+
+function closeLyrics() {
+  $('#np').classList.remove('lyrics-open');
+  $('#np-lyrics').hidden = true;
+  popLayer($('#np-lyrics'));
+}
+
+async function loadLyrics() {
+  const t = P.state?.track;
+  const box = $('#lyr-lines');
+  lyricsUri = t?.uri || null;
+  lyrics = null;
+  lyricsActive = -2;
+  lyricsOffset = 0;
+  box.style.transform = '';
+  box.classList.remove('is-plain');
+  $('#lyr-title').textContent = t?.name || '';
+  $('#lyr-artist').textContent = t ? artistsText(t.artists) : '';
+  setImg($('#lyr-art'), pickImage(t?.album?.images, 300));
+  if (!t) { box.innerHTML = '<p class="lyr-msg">Nada tocando.</p>'; return; }
+  box.innerHTML = '<p class="lyr-msg">Procurando a letra…</p>';
+  try {
+    const l = await getLyrics(t);
+    if (lyricsUri !== t.uri) return;
+    if (!l) box.innerHTML = '<p class="lyr-msg">Letra não encontrada para esta música.</p>';
+    else if (l.instrumental) box.innerHTML = '<p class="lyr-msg">♪ Música instrumental</p>';
+    else {
+      lyrics = l;
+      box.innerHTML = renderLines(l);
+      box.classList.toggle('is-plain', !l.synced);
+      $('#lyr-hint').textContent = l.synced
+        ? 'OK pausa · ◀ ▶ 10s · Voltar fecha a letra'
+        : 'Letra sem sincronia: ▲ ▼ rolam · OK pausa · Voltar fecha a letra';
+      lyricsTick(true);
+    }
+  } catch {
+    if (lyricsUri === t.uri) box.innerHTML = '<p class="lyr-msg">Não foi possível carregar a letra agora.</p>';
+  }
+}
+
+// Destaca a linha que está tocando e a mantém a ~40% da altura
+function lyricsTick(force = false) {
+  if (!lyrics?.synced || !lyricsOpen()) return;
+  const i = activeIndex(lyrics.synced, position());
+  if (i === lyricsActive && !force) return;
+  lyricsActive = i;
+  const lines = [...$('#lyr-lines').children];
+  lines.forEach((el, k) => {
+    el.classList.toggle('active', k === i);
+    el.classList.toggle('past', k < i);
+  });
+  const cur = lines[Math.max(i, 0)];
+  if (!cur) return;
+  const h = $('#lyr-scroll').clientHeight;
+  $('#lyr-lines').style.transform = `translateY(${Math.round(h * 0.4 - (cur.offsetTop + cur.offsetHeight / 2))}px)`;
+}
+
+// Letras sem sincronia: ▲ ▼ rolam
+function lyricsScroll(dir) {
+  if (!lyrics?.plain) return;
+  const h = $('#lyr-scroll').clientHeight;
+  const max = Math.max(0, $('#lyr-lines').scrollHeight - h * 0.6);
+  lyricsOffset = Math.min(max, Math.max(0, lyricsOffset + dir * h * 0.35));
+  $('#lyr-lines').style.transform = `translateY(${-lyricsOffset}px)`;
 }
 
 function setImg(img, url) {
@@ -149,6 +236,7 @@ function renderPlayer() {
       el.classList.add('swap');
     }
     loadQueue();
+    if (lyricsOpen()) loadLyrics();
   }
 
   const playIcon = icon(s?.isPlaying ? 'pause' : 'play');
@@ -240,6 +328,7 @@ function tick() {
   const frac = dur ? Math.min(1, pos / dur) : 0;
   $('#mini-bar').style.transform = `scaleX(${frac})`;
   $('#np-bar').style.transform = `scaleX(${frac})`;
+  $('#lyr-bar').style.transform = `scaleX(${frac})`;
   $('#mini-pos').textContent = $('#np-pos').textContent = fmtTime(pos);
   $('#mini-dur').textContent = $('#np-dur').textContent = fmtTime(dur);
 }
@@ -306,6 +395,7 @@ const actions = {
       : { list: 'queue', index: i });
     if (ok) toast('Pulando para a música escolhida');
   },
+  lyrics: () => openLyrics(),
   toggle: () => togglePlay(),
   next: () => next(),
   prev: () => prev(),
@@ -375,6 +465,7 @@ document.addEventListener('keydown', (e) => {
       return;
     case 'up':
     case 'down':
+      if (lyricsOpen()) { lyricsScroll(k === 'up' ? -1 : 1); return; }
       move(k, { smooth: !e.repeat });
       return;
     case 'enter':
@@ -469,6 +560,7 @@ async function startApp() {
   renderPlayer();
   renderLike();
   setInterval(tick, 500);
+  setInterval(lyricsTick, 200);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 
   initSdk();

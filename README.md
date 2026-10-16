@@ -16,6 +16,7 @@ hospedagem **HTTPS** (o DRM Widevine só funciona em contexto seguro) e acesso a
 | `js/nav.js` | Navegação espacial pelas setas do controle |
 | `js/auth.js` | Login PKCE (sem segredo) — direto na TV ou pareando pelo celular via QR |
 | `pair.html` / `callback.html` | Páginas que o celular abre durante o pareamento |
+| `js/lyrics.js` | Letras sincronizadas via [LRCLIB](https://lrclib.net) (aberto, sem chave de API) |
 | `js/icons.js` | Ícones do [Phosphor Icons](https://phosphoricons.com) (MIT), só os usados no app |
 
 **Teclas do controle:** setas/OK navegam · Voltar volta (na tela inicial pergunta se quer sair) ·
@@ -80,4 +81,5 @@ A tela **Dispositivos → Diagnóstico** do app mostra o status do player, do Wi
 - Busca retorna até 10 itens por tipo (limite atual da API).
 - Se o SDK não iniciar na TV (ex.: o Spotify recusar o navegador), o app continua funcionando como
   **controle remoto** de outros dispositivos — a tela Dispositivos mostra o motivo.
-- Letras, podcasts em vídeo e Spotify Jam não estão disponíveis pela API pública.
+- A letra do app oficial (Musixmatch) não está na API pública; o app usa o LRCLIB, que cobre bem músicas populares mas pode não ter algumas (aí mostra "Letra não encontrada").
+- Podcasts em vídeo, clipes e Spotify Jam não estão disponíveis pela API pública.
