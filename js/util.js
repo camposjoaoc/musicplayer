@@ -7,6 +7,11 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// O navegador interno da TV manda um Accept-Language malformado ("en,en;q=0.5;q=0.9") e
+// parte da API do Spotify (player, token) recusa com 400. Mandamos o nosso, bem formado.
+const lang = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(navigator.language || '') ? navigator.language : 'en';
+export const LANG_HEADER = { 'Accept-Language': lang === 'en' ? 'en' : `${lang},en;q=0.8` };
+
 export const store = {
   get(key, fallback = null) {
     try {

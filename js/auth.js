@@ -1,7 +1,7 @@
 // Login Spotify com Authorization Code + PKCE (sem client secret).
 // Duas formas: direto na TV (redirect) ou pareando pelo celular via QR code.
 import { APP_BASE, CLIENT_ID, REDIRECT_URI, RELAY, SCOPES } from './config.js';
-import { b64url, fromB64url, randomBytes, store } from './util.js';
+import { LANG_HEADER, b64url, fromB64url, randomBytes, store } from './util.js';
 
 const AUTHORIZE = 'https://accounts.spotify.com/authorize';
 const TOKEN = 'https://accounts.spotify.com/api/token';
@@ -31,7 +31,7 @@ export async function tokenRequest(params) {
   try {
     res = await fetch(TOKEN, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { ...LANG_HEADER, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ client_id: CLIENT_ID, ...params }).toString(),
     });
   } catch (e) {

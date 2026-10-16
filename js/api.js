@@ -1,5 +1,5 @@
 import { getAccessToken } from './auth.js';
-import { sleep } from './util.js';
+import { LANG_HEADER, sleep } from './util.js';
 
 const BASE = 'https://api.spotify.com/v1';
 
@@ -11,7 +11,7 @@ export async function api(path, { method = 'GET', query, body, retry = true } = 
   const token = await getAccessToken();
   const res = await fetch(url, {
     method,
-    headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    headers: { ...LANG_HEADER, Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
 
