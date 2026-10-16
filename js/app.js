@@ -6,7 +6,7 @@ import {
   P, activateAudio, bus, cycleRepeat, explain, initSdk, next, play, position, prev, refresh,
   seekBy, startPolling, toggleLike, togglePlay, toggleShuffle, transfer,
 } from './player.js';
-import { $, artistsText, colorOf, esc, fmtTime, icon, pickImage, store, toast } from './util.js';
+import { $, artistsText, colorOf, esc, fmtTime, hydrateIcons, icon, pickImage, store, toast } from './util.js';
 import { deviceIcon, lists, loadMore, searchKey, skeleton, views } from './views.js';
 
 const ctx = { me: null };
@@ -456,7 +456,7 @@ async function startApp() {
   try {
     ctx.me = await S.me();
     const avatar = pickImage(ctx.me.images, 64);
-    $('#user-chip').innerHTML = `${avatar ? `<img src="${esc(avatar)}" alt="">` : icon('person')}<span class="label">${esc(ctx.me.display_name || '')}</span>`;
+    $('#user-chip').innerHTML = `<span class="slot">${avatar ? `<img src="${esc(avatar)}" alt="">` : icon('person')}</span><span class="label">${esc(ctx.me.display_name || '')}</span>`;
   } catch {}
 
   bus.addEventListener('state', renderPlayer);
@@ -483,6 +483,7 @@ store.del('spotv.ytkey');
 store.del('spotv.clips');
 
 async function boot() {
+  hydrateIcons();
   if (!CLIENT_ID) return showSetup();
   try {
     if (await auth.completeTvLogin()) toast('Conectado!');

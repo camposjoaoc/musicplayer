@@ -135,7 +135,7 @@ function homeHero(track, context, isCurrent) {
       <div class="home-hero-sub">${esc(artistsText(track.artists))}${track.album?.name ? ` · ${esc(track.album.name)}` : ''}</div>
       <div class="hero-actions">
         <div class="btn primary" data-focus data-autofocus data-key="hero-play" data-action="resume"${dataAttrs({ uri: track.uri, context: ctx })}>${icon('play')}<span>${isCurrent ? 'Abrir player' : 'Continuar'}</span></div>
-        ${albumId ? `<div class="btn" data-focus data-key="hero-album" data-action="open" data-type="album" data-id="${esc(albumId)}">${icon('library')}<span>Ver álbum</span></div>` : ''}
+        ${albumId ? `<div class="btn" data-focus data-key="hero-album" data-action="open" data-type="album" data-id="${esc(albumId)}">${icon('album')}<span>Ver álbum</span></div>` : ''}
       </div>
     </div>
   </section>`;

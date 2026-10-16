@@ -16,7 +16,7 @@
 
   <!-- Configuração pendente (sem Client ID) -->
   <section id="setup" class="screen setup" hidden>
-    <div class="brand big"><span class="brand-mark"><svg class="ic" viewBox="0 0 24 24"><path d="M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z"/></svg></span>Spotify TV</div>
+    <div class="brand big"><span class="brand-mark" data-icon="waves"></span>Spotify TV</div>
     <h1>Falta configurar o Client ID</h1>
     <ol class="setup-steps">
       <li>Crie um app em <b>developer.spotify.com/dashboard</b> marcando “Web API” e “Web Playback SDK”.</li>
@@ -27,7 +27,7 @@
 
   <!-- Login -->
   <section id="login" class="screen login" hidden>
-    <div class="brand big"><span class="brand-mark"><svg class="ic" viewBox="0 0 24 24"><path d="M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z"/></svg></span>Spotify TV</div>
+    <div class="brand big"><span class="brand-mark" data-icon="waves"></span>Spotify TV</div>
     <p class="login-lead">Entre com sua conta Spotify Premium para ouvir aqui na TV.</p>
     <div class="login-options">
       <div class="login-card">
@@ -53,19 +53,19 @@
   <!-- App -->
   <div id="app" class="app" hidden>
     <nav id="sidebar" class="sidebar" data-zone data-clip data-exits="right">
-      <div class="brand"><span class="brand-mark"><svg class="ic" viewBox="0 0 24 24"><path d="M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z"/></svg></span><span class="label">Spotify TV</span></div>
-      <div class="nav-item" data-focus data-key="nav-home" data-action="nav" data-view="home"><svg class="ic" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span class="label">Início</span></div>
-      <div class="nav-item" data-focus data-key="nav-search" data-action="nav" data-view="search"><svg class="ic" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg><span class="label">Buscar</span></div>
-      <div class="nav-item" data-focus data-key="nav-library" data-action="nav" data-view="library"><svg class="ic" viewBox="0 0 24 24"><path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 5h-3v5.5a2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1 2.5-2.5c.57 0 1.08.19 1.5.51V5h4v2zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6z"/></svg><span class="label">Biblioteca</span></div>
-      <div class="nav-item" data-focus data-key="nav-np" data-action="now-playing"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><span class="label">Tocando agora</span></div>
-      <div class="nav-item" data-focus data-key="nav-devices" data-action="nav" data-view="devices"><svg class="ic" viewBox="0 0 24 24"><path d="M17 2H7c-1.1 0-2 .9-2 2v16c0 1.1.9 1.99 2 1.99L17 22c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-5 2c1.1 0 2 .9 2 2s-.9 2-2 2c-1.11 0-2-.9-2-2s.89-2 2-2zm0 16c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg><span class="label">Dispositivos</span></div>
+      <div class="brand"><span class="slot"><span class="brand-mark" data-icon="waves"></span></span><span class="label">Spotify TV</span></div>
+      <div class="nav-item" data-focus data-key="nav-home" data-action="nav" data-view="home"><span class="slot" data-icon="home" data-dual></span><span class="label">Início</span></div>
+      <div class="nav-item" data-focus data-key="nav-search" data-action="nav" data-view="search"><span class="slot" data-icon="search" data-dual></span><span class="label">Buscar</span></div>
+      <div class="nav-item" data-focus data-key="nav-library" data-action="nav" data-view="library"><span class="slot" data-icon="library" data-dual></span><span class="label">Biblioteca</span></div>
+      <div class="nav-item" data-focus data-key="nav-np" data-action="now-playing"><span class="slot" data-icon="nowPlaying" data-dual></span><span class="label">Tocando agora</span></div>
+      <div class="nav-item" data-focus data-key="nav-devices" data-action="nav" data-view="devices"><span class="slot" data-icon="speaker" data-dual></span><span class="label">Dispositivos</span></div>
 
       <div class="sidebar-foot">
         <ul class="legend">
-          <li><i class="k-red"></i><span class="label">Tocando agora</span></li>
-          <li><i class="k-green"></i><span class="label">Buscar</span></li>
-          <li><i class="k-yellow"></i><span class="label">Biblioteca</span></li>
-          <li><i class="k-blue"></i><span class="label">Dispositivos</span></li>
+          <li><span class="slot"><i class="k-red"></i></span><span class="label">Tocando agora</span></li>
+          <li><span class="slot"><i class="k-green"></i></span><span class="label">Buscar</span></li>
+          <li><span class="slot"><i class="k-yellow"></i></span><span class="label">Biblioteca</span></li>
+          <li><span class="slot"><i class="k-blue"></i></span><span class="label">Dispositivos</span></li>
         </ul>
         <div id="user-chip" class="user-chip"></div>
       </div>
@@ -80,9 +80,9 @@
       </div>
       <div class="mini-center">
         <div class="mini-controls">
-          <div class="cbtn" data-focus data-key="mini-prev" data-action="prev"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></div>
+          <div class="cbtn" data-focus data-key="mini-prev" data-action="prev" data-icon="prev"></div>
           <div class="cbtn main" id="mini-toggle" data-focus data-key="mini-toggle" data-action="toggle"></div>
-          <div class="cbtn" data-focus data-key="mini-next" data-action="next"><svg class="ic" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></div>
+          <div class="cbtn" data-focus data-key="mini-next" data-action="next" data-icon="next"></div>
         </div>
         <div class="mini-progress"><span id="mini-pos">0:00</span><div class="bar"><div id="mini-bar" class="bar-fill"></div></div><span id="mini-dur">0:00</span></div>
       </div>
@@ -108,10 +108,10 @@
           <div class="np-times"><span id="np-pos">0:00</span><span id="np-dur">0:00</span></div>
         </div>
         <div class="np-controls">
-          <div class="cbtn" id="np-shuffle" data-focus data-key="np-shuffle" data-action="shuffle"><svg class="ic" viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></div>
-          <div class="cbtn" data-focus data-key="np-prev" data-action="prev"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></div>
+          <div class="cbtn" id="np-shuffle" data-focus data-key="np-shuffle" data-action="shuffle" data-icon="shuffle"></div>
+          <div class="cbtn" data-focus data-key="np-prev" data-action="prev" data-icon="prev"></div>
           <div class="cbtn main" id="np-toggle" data-focus data-autofocus data-key="np-toggle" data-action="toggle"></div>
-          <div class="cbtn" data-focus data-key="np-next" data-action="next"><svg class="ic" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></div>
+          <div class="cbtn" data-focus data-key="np-next" data-action="next" data-icon="next"></div>
           <div class="cbtn" id="np-repeat" data-focus data-key="np-repeat" data-action="repeat"></div>
           <div class="cbtn" id="np-like" data-focus data-key="np-like" data-action="like"></div>
         </div>

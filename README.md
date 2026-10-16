@@ -16,6 +16,7 @@ hospedagem **HTTPS** (o DRM Widevine só funciona em contexto seguro) e acesso a
 | `js/nav.js` | Navegação espacial pelas setas do controle |
 | `js/auth.js` | Login PKCE (sem segredo) — direto na TV ou pareando pelo celular via QR |
 | `pair.html` / `callback.html` | Páginas que o celular abre durante o pareamento |
+| `js/icons.js` | Ícones do [Phosphor Icons](https://phosphoricons.com) (MIT), só os usados no app |
 
 **Teclas do controle:** setas/OK navegam · Voltar volta (na tela inicial pergunta se quer sair) ·
 Play/Pause/Stop/⏩/⏪ controlam a música · CH+/CH− próxima/anterior ·
