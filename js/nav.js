@@ -21,6 +21,7 @@ export function focus(el, { scroll = true, smooth = true } = {}) {
     current?.classList.remove('is-focused');
     current = el;
     el.classList.add('is-focused');
+    document.dispatchEvent(new CustomEvent('focuschange', { detail: el }));
   }
   if (scroll) el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
 }
@@ -64,7 +65,12 @@ export function move(dir, { smooth = true } = {}) {
   const cur = getFocused();
   if (!cur || !items.includes(cur)) return focusFirst(root);
 
-  const r = cur.getBoundingClientRect();
+  let r = cur.getBoundingClientRect();
+  const curClip = cur.closest('[data-clip]');
+  if (curClip) {
+    const z = curClip.getBoundingClientRect();
+    r = { left: r.left, right: Math.min(r.right, z.right), top: r.top, bottom: r.bottom, width: Math.min(r.right, z.right) - r.left, height: r.height };
+  }
   const cx = r.left + r.width / 2;
   const cy = r.top + r.height / 2;
   const horiz = dir === 'left' || dir === 'right';
@@ -85,7 +91,14 @@ export function move(dir, { smooth = true } = {}) {
     if (el === cur) continue;
     const same = el.closest('[data-zone]') === zone;
     if (!same && !exits.includes(dir)) continue;
-    const b = el.getBoundingClientRect();
+    let b = el.getBoundingClientRect();
+    // Zonas com [data-clip] (o menu recolhido) cortam o que está escondido pelo overflow
+    const clipZone = el.closest('[data-clip]');
+    if (clipZone) {
+      const z = clipZone.getBoundingClientRect();
+      b = { left: Math.max(b.left, z.left), right: Math.min(b.right, z.right), top: b.top, bottom: b.bottom, width: 0, height: b.height };
+      b.width = Math.max(0, b.right - b.left);
+    }
     // Cards de outra fileira só contam se estiverem visíveis nela (não os rolados para fora)
     const row = el.closest('[data-nav-row]');
     if (row && row !== curRow) {
@@ -107,20 +120,24 @@ export function move(dir, { smooth = true } = {}) {
     scored.push({ el, same, overlap, score: gap + off * (horiz ? 2 : 0.5) });
   }
 
-  // Ordem de preferência: mesma zona e mesma linha/coluna → mesma zona → outra zona.
-  // Dentro de uma fileira de cards, ←/→ nunca pula para outra fileira.
+  // Ordem de preferência: mesma zona e mesma linha/coluna primeiro. Na vertical, depois
+  // qualquer item da zona; na horizontal, sair da zona (ex.: ← abre o menu) vem antes
+  // de pular na diagonal. Dentro de uma fileira de cards, ←/→ nunca pula de fileira.
   const inRow = horiz && !!cur.closest('[data-nav-row]');
-  const tiers = [
-    (s) => s.same && s.overlap,
-    (s) => s.same && !inRow,
-    (s) => !s.same && s.overlap,
-    (s) => !s.same,
-  ];
+  const tiers = horiz
+    ? [(s) => s.same && s.overlap, (s) => !s.same && s.overlap, (s) => !s.same, (s) => s.same && !inRow]
+    : [(s) => s.same && s.overlap, (s) => s.same, (s) => !s.same && s.overlap, (s) => !s.same];
   for (const tier of tiers) {
     const pool = scored.filter(tier);
     if (pool.length) {
       pool.sort((a, b) => a.score - b.score);
-      focus(pool[0].el, { smooth });
+      let target = pool[0].el;
+      // Ao entrar no menu, vai para a seção ativa em vez do item mais próximo
+      if (!pool[0].same) {
+        const active = target.closest('[data-zone]')?.querySelector('[data-focus].active');
+        if (active && visible(active)) target = active;
+      }
+      focus(target, { smooth });
       return;
     }
   }

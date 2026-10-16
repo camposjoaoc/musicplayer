@@ -58,6 +58,7 @@ export const S = {
 
   state: () => api('/me/player', { query: { additional_types: 'track,episode' } }),
   devices: () => api('/me/player/devices'),
+  queue: () => api('/me/player/queue'),
   transfer: (id, play) => api('/me/player', { method: 'PUT', body: { device_ids: [id], play } }),
   play: (body, device_id) => api('/me/player/play', { method: 'PUT', query: { device_id }, body }),
   pause: (device_id) => api('/me/player/pause', { method: 'PUT', query: { device_id } }),

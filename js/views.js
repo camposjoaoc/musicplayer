@@ -1,7 +1,7 @@
 import { S } from './api.js';
 import { focus } from './nav.js';
 import { P, drmCheck, sdkLabel } from './player.js';
-import { artistsText, esc, fmtTime, icon, pickImage, stripHtml } from './util.js';
+import { artistsText, colorOf, esc, fmtTime, icon, pickImage, stripHtml } from './util.js';
 
 // Listas de URIs para tocar quando não há um "contexto" Spotify (fallback)
 export const lists = new Map();
@@ -21,7 +21,7 @@ const dataAttrs = (data) =>
 
 function card({ key, images, title, sub, action, data = {}, round = false, kind }) {
   return `<div class="card${round ? ' round' : ''}" data-focus data-key="${esc(key)}" data-action="${action}"${dataAttrs(data)}>
-    <div class="card-art">${art(images, 300, kind)}</div>
+    <div class="card-art">${art(images, 300, kind)}<span class="card-badge"><span class="eq"><i></i><i></i><i></i></span></span></div>
     <div class="card-title">${esc(title)}</div>
     <div class="card-sub">${esc(sub || '')}</div>
   </div>`;
@@ -53,7 +53,7 @@ const trackCard = (t, ctx) => card({
 });
 
 const likedCard = () => `<div class="card" data-focus data-key="liked" data-action="open" data-type="liked">
-    <div class="card-art"><div class="liked-art">${icon('heart')}</div></div>
+    <div class="card-art"><div class="liked-art">${icon('heart')}</div><span class="card-badge"><span class="eq"><i></i><i></i><i></i></span></span></div>
     <div class="card-title">Músicas curtidas</div>
     <div class="card-sub">Sua biblioteca</div>
   </div>`;
@@ -119,26 +119,54 @@ const playlistTracks = (pageObj) =>
 
 // ---- Telas -------------------------------------------------------------
 
+// Destaque "Continuar ouvindo": o que está tocando agora ou a última faixa ouvida
+function homeHero(track, context, isCurrent) {
+  if (!track) return '';
+  const ctx = contextFor(track, context);
+  const albumId = track.album?.uri?.split(':')[2];
+  return `<section class="home-hero">
+    <div class="home-hero-bg"></div>
+    <div class="home-hero-art">${art(track.album?.images, 640)}</div>
+    <div class="home-hero-info">
+      <div class="eyebrow">${isCurrent ? 'Tocando agora' : 'Continuar ouvindo'}</div>
+      <h2 class="home-hero-title">${esc(track.name)}</h2>
+      <div class="home-hero-sub">${esc(artistsText(track.artists))}${track.album?.name ? ` · ${esc(track.album.name)}` : ''}</div>
+      <div class="hero-actions">
+        <div class="btn primary" data-focus data-autofocus data-key="hero-play" data-action="resume"${dataAttrs({ uri: track.uri, context: ctx })}>${icon('play')}<span>${isCurrent ? 'Abrir player' : 'Continuar'}</span></div>
+        ${albumId ? `<div class="btn" data-focus data-key="hero-album" data-action="open" data-type="album" data-id="${esc(albumId)}">${icon('library')}<span>Ver álbum</span></div>` : ''}
+      </div>
+    </div>
+  </section>`;
+}
+
 async function home(el, { me, isStale }) {
   const r = await Promise.allSettled([S.recent(), S.playlists(), S.topArtists(), S.topTracks(), S.savedAlbums()]);
   if (isStale()) return;
   const seen = new Set();
-  const recent = (value(r[0])?.items || [])
-    .filter((i) => i.track && !seen.has(i.track.id) && seen.add(i.track.id))
-    .map((i) => trackCard(i.track, i.context?.uri));
+  const recentItems = (value(r[0])?.items || []).filter((i) => i.track && !seen.has(i.track.id) && seen.add(i.track.id));
+  const recent = recentItems.map((i) => trackCard(i.track, i.context?.uri));
   const playlists = [likedCard(), ...(value(r[1])?.items || []).filter(Boolean).slice(0, 30).map(playlistCard)];
   const artists = (value(r[2])?.items || []).map(artistCard);
   const tops = (value(r[3])?.items || []).map((t) => trackCard(t));
   const albums = (value(r[4])?.items || []).map((i) => i.album).filter(Boolean).map(albumCard);
   const name = me?.display_name?.split(' ')[0];
+
+  const current = P.state?.track?.album?.images?.length ? P.state : null;
+  const heroTrack = current?.track || recentItems[0]?.track;
+  const heroCtx = current ? current.contextUri : recentItems[0]?.context?.uri;
+
   el.innerHTML = page(`
     <h1 class="greeting">${greeting()}${name ? `, ${esc(name)}` : ''}</h1>
+    ${homeHero(heroTrack, heroCtx, !!current?.isPlaying)}
     ${row('Tocadas recentemente', recent)}
     ${row('Suas playlists', playlists)}
     ${row('Seus artistas do momento', artists)}
     ${row('Suas mais ouvidas', tops)}
     ${row('Álbuns salvos', albums)}
   `);
+  colorOf(pickImage(heroTrack?.album?.images, 64)).then((rgb) => {
+    if (rgb) el.querySelector('.home-hero')?.style.setProperty('--hero-rgb', rgb.join(','));
+  });
 }
 
 async function library(el, { isStale }) {
@@ -374,6 +402,29 @@ export async function loadMore() {
   } finally {
     if (btn.isConnected) { delete btn.dataset.busy; btn.textContent = 'Carregar mais'; }
   }
+}
+
+// ---- Esqueletos de carregamento -----------------------------------------
+
+const skCards = (n, round = false) => Array.from({ length: n }, () =>
+  `<div class="card sk-card${round ? ' round' : ''}"><div class="card-art sk"></div><div class="sk sk-line"></div><div class="sk sk-line short"></div></div>`).join('');
+const skRow = (round) => `<section class="row"><div class="sk sk-title"></div><div class="row-track">${skCards(8, round)}</div></section>`;
+const skTracks = (n) => Array.from({ length: n }, () =>
+  `<div class="track sk-track"><div></div><div class="track-art sk"></div><div class="track-main"><div class="sk sk-line"></div><div class="sk sk-line short"></div></div></div>`).join('');
+const skHero = (round) => `<header class="hero"><div class="hero-art sk${round ? ' round' : ''}"></div><div class="hero-info"><div class="sk sk-line short"></div><div class="sk sk-h1"></div><div class="sk sk-line"></div><div class="hero-actions"><div class="sk sk-btn"></div><div class="sk sk-btn"></div></div></div></header>`;
+
+const SKELETONS = {
+  home: () => `<div class="sk sk-h1 greet"></div><div class="home-hero sk-hero sk"></div>${skRow()}${skRow()}`,
+  library: () => `<div class="sk sk-h1"></div><section class="section"><div class="sk sk-title"></div><div class="grid">${skCards(14)}</div></section>`,
+  liked: () => skHero() + skTracks(8),
+  playlist: () => skHero() + skTracks(8),
+  album: () => skHero() + skTracks(8),
+  artist: () => skHero(true) + skTracks(5),
+};
+
+export function skeleton(name) {
+  const fn = SKELETONS[name];
+  return fn ? page(fn(), 'is-skeleton') : '<div class="view"><div class="loading"><div class="spinner"></div></div></div>';
 }
 
 export const views = { home, search, library, liked, playlist, album, artist, devices };

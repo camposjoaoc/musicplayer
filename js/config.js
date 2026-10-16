@@ -10,6 +10,10 @@ export const DEVICE_NAME = 'Philips TV';
 //   http://127.0.0.1:5173/callback.html   (teste local)
 export const REDIRECT_URI = new URL('callback.html', location.href).href.split('?')[0];
 
+// Opcional: chave da YouTube Data API v3 para o botão "Clipe" (veja o README).
+// Restrinja a chave ao seu domínio no Google Cloud — ela fica visível no código.
+export const YOUTUBE_API_KEY = '';
+
 // Relay público usado só no login pelo celular. A mensagem vai criptografada
 // (AES-GCM) com uma chave que existe apenas no QR code.
 export const RELAY = 'https://ntfy.sh';

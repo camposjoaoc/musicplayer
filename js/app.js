@@ -7,7 +7,8 @@ import {
   seekBy, startPolling, toggleLike, togglePlay, toggleShuffle, transfer,
 } from './player.js';
 import { $, artistsText, colorOf, esc, fmtTime, icon, pickImage, store, toast } from './util.js';
-import { deviceIcon, lists, loadMore, searchKey, views } from './views.js';
+import { closeVideo, isVideoOpen, openVideo, videoEnabled, videoKey } from './video.js';
+import { deviceIcon, lists, loadMore, searchKey, skeleton, views } from './views.js';
 
 const ctx = { me: null };
 const stack = [];
@@ -36,7 +37,7 @@ async function render({ restore = false } = {}) {
   const el = $('#content');
   const section = stack[1]?.name || 'home';
   document.querySelectorAll('.nav-item[data-view]').forEach((n) => n.classList.toggle('active', n.dataset.view === section));
-  el.innerHTML = '<div class="view"><div class="loading"><div class="spinner"></div></div></div>';
+  el.innerHTML = skeleton(entry.name);
   try {
     await views[entry.name](el, { params: entry.params, me: ctx.me, isStale: () => seq !== renderSeq });
   } catch (e) {
@@ -47,6 +48,7 @@ async function render({ restore = false } = {}) {
     </div></div>`;
   }
   if (seq !== renderSeq) return;
+  markLoadedImages(el);
   highlightPlaying();
   if (isLayerOpen()) return;
   if (!(restore && entry.focusKey && focusByKey(entry.focusKey, el))) focusFirst(el);
@@ -54,6 +56,7 @@ async function render({ restore = false } = {}) {
 
 function back() {
   if (!$('#dialog').hidden) return closeDialog();
+  if (isVideoOpen()) return closeVideo();
   if (!$('#np').hidden) return closeNowPlaying();
   if (stack.length > 1) {
     stack.pop();
@@ -69,6 +72,7 @@ function back() {
 function nav(view) {
   if (!started) return;
   if (!$('#dialog').hidden) closeDialog();
+  if (isVideoOpen()) closeVideo();
   if (!$('#np').hidden) closeNowPlaying();
   go(view, {}, { root: true });
 }
@@ -98,7 +102,9 @@ function openNowPlaying() {
   $('#np').hidden = false;
   pushLayer($('#np'));
   focus($('#np-toggle'), { smooth: false });
+  updateClock();
   renderPlayer();
+  loadQueue();
 }
 
 function closeNowPlaying() {
@@ -135,6 +141,19 @@ function renderPlayer() {
   $('#np-album').textContent = t?.album?.name || '';
   setImg($('#mini-art'), pickImage(t?.album?.images, 64));
   setImg($('#np-art'), pickImage(t?.album?.images, 640));
+  setImg($('#np-bg-art'), pickImage(t?.album?.images, 300));
+  $('#np-clip').hidden = !videoEnabled() || !t;
+
+  // Troca de faixa: anima a capa e o texto e atualiza a fila
+  if ((t?.uri || '') !== lastTrackUri) {
+    lastTrackUri = t?.uri || '';
+    for (const el of [$('#np-art'), $('.np-text')]) {
+      el.classList.remove('swap');
+      void el.offsetWidth;
+      el.classList.add('swap');
+    }
+    loadQueue();
+  }
 
   const playIcon = icon(s?.isPlaying ? 'pause' : 'play');
   $('#mini-toggle').innerHTML = playIcon;
@@ -146,7 +165,7 @@ function renderPlayer() {
   const dev = s?.device;
   const devName = dev ? (dev.id === P.deviceId ? 'Esta TV' : dev.name) : '';
   $('#mini-device').innerHTML = dev ? `${icon(deviceIcon(dev.type))}<span>${esc(devName)}</span>` : '';
-  $('#np-device').innerHTML = dev ? `${icon(deviceIcon(dev.type))}<span>Tocando em ${esc(devName)}</span>` : '';
+  $('#np-device').innerHTML = dev ? `${icon(deviceIcon(dev.type))}<span>${s.isPlaying ? 'Tocando' : 'Pausado'} em ${esc(devName)}</span>` : '';
 
   updateColor(t);
   highlightPlaying();
@@ -162,13 +181,62 @@ function renderLike() {
 
 function highlightPlaying() {
   const uri = P.state?.track?.uri;
+  const ctxUri = P.state?.contextUri || '';
   const playing = !!P.state?.isPlaying;
-  document.querySelectorAll('#content .track').forEach((el) => {
-    const on = el.dataset.uri === uri;
+  const mark = (el, on) => {
     el.classList.toggle('is-playing', on);
     el.classList.toggle('paused', on && !playing);
+  };
+  document.querySelectorAll('#content .track').forEach((el) => mark(el, !!uri && el.dataset.uri === uri));
+  // Cards: playlist/álbum/artista que é o contexto atual, ou a própria faixa
+  document.querySelectorAll('#content .card').forEach((el) => {
+    const k = el.dataset.key;
+    mark(el, !!uri && (k === ctxUri || k === `card:${uri}` || (k === 'liked' && ctxUri.endsWith(':collection'))));
   });
 }
+
+// ---- Fila, relógio, imagens --------------------------------------------
+
+let lastTrackUri = null;
+let queueSeq = 0;
+
+async function loadQueue() {
+  if ($('#np').hidden || !P.state?.track) { $('#np-queue').hidden = true; return; }
+  const seq = ++queueSeq;
+  try {
+    const q = await S.queue();
+    if (seq !== queueSeq) return;
+    const seen = new Set([P.state?.track?.uri]);
+    const items = (q?.queue || []).filter((t) => t?.uri && !seen.has(t.uri) && seen.add(t.uri)).slice(0, 5);
+    $('#np-queue').hidden = !items.length;
+    $('#np-queue-list').innerHTML = items.map((t, i) => {
+      const img = pickImage(t.album?.images || t.images, 64);
+      return `<div class="q-item" data-focus data-key="q-${i}" data-action="play-queue" data-uri="${esc(t.uri)}">
+        ${img ? `<img src="${esc(img)}" alt="">` : '<div class="q-ph"></div>'}
+        <div class="q-text"><div class="q-title">${esc(t.name)}</div><div class="q-artist">${esc(artistsText(t.artists) || t.show?.name || '')}</div></div>
+      </div>`;
+    }).join('');
+    lists.set('queue', items.map((t) => t.uri));
+  } catch {
+    $('#np-queue').hidden = true;
+  }
+}
+
+function updateClock() {
+  $('#np-clock').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Imagens entram com fade quando terminam de carregar
+document.addEventListener('load', (e) => { if (e.target.tagName === 'IMG') e.target.classList.add('loaded'); }, true);
+document.addEventListener('error', (e) => { if (e.target.tagName === 'IMG') e.target.classList.add('loaded', 'broken'); }, true);
+function markLoadedImages(root) {
+  root.querySelectorAll('img').forEach((img) => { if (img.complete) img.classList.add('loaded'); });
+}
+
+// Menu lateral: recolhido em ícones; abre quando o foco entra nele
+document.addEventListener('focuschange', (e) => {
+  $('#app').classList.toggle('nav-open', !!$('#sidebar')?.contains(e.detail));
+});
 
 function tick() {
   const dur = P.state?.track?.duration || 0;
@@ -225,6 +293,43 @@ const actions = {
   'play-track': async (d) => {
     if (await startPlayback({ contextUri: d.context, offsetUri: d.uri, list: d.list, index: numberOrUndef(d.index), uri: d.uri })) openNowPlaying();
   },
+  resume: async (d) => {
+    const s = P.state;
+    if (s?.track?.uri === d.uri) {
+      if (!s.isPlaying) await togglePlay();
+      openNowPlaying();
+    } else {
+      await actions['play-track'](d);
+    }
+  },
+  'play-queue': async (d) => {
+    const uris = lists.get('queue') || [];
+    const i = Math.max(0, uris.indexOf(d.uri));
+    const ok = await startPlayback(P.state?.contextUri
+      ? { contextUri: P.state.contextUri, offsetUri: d.uri, list: 'queue', index: i }
+      : { list: 'queue', index: i });
+    if (ok) toast('Pulando para a música escolhida');
+  },
+  clip: () => {
+    const wasPlaying = !!P.state?.isPlaying;
+    openVideo(P.state?.track, {
+      onOpen: () => {
+        if (wasPlaying) togglePlay();
+        pushLayer($('#video'));
+      },
+      onClosed: ({ ended }) => {
+        popLayer($('#video'));
+        if (!wasPlaying) return;
+        if (ended) {
+          next();
+          setTimeout(() => { if (!P.state?.isPlaying) togglePlay(); }, 1500);
+        } else {
+          togglePlay();
+        }
+      },
+    });
+  },
+  'video-toggle': () => videoKey('enter'),
   toggle: () => togglePlay(),
   next: () => next(),
   prev: () => prev(),
@@ -284,6 +389,7 @@ document.addEventListener('keydown', (e) => {
   const k = e.key === ' ' ? 'playpause' : KEYS[e.keyCode];
   if (!k) return;
   e.preventDefault();
+  if (videoKey(k)) return;
 
   const f = getFocused();
   switch (k) {
@@ -316,7 +422,8 @@ document.addEventListener('keydown', (e) => {
 
 // Depois de 1 min parado com música tocando, abre a tela cheia (o Ambilight agradece)
 setInterval(() => {
-  if (started && P.state?.isPlaying && $('#np').hidden && $('#dialog').hidden && Date.now() - lastInput > 60_000) openNowPlaying();
+  if (started && P.state?.isPlaying && $('#np').hidden && $('#dialog').hidden && !isVideoOpen() && Date.now() - lastInput > 60_000) openNowPlaying();
+  if (!$('#np').hidden) updateClock();
 }, 5000);
 
 // ---- Login -------------------------------------------------------------
@@ -374,7 +481,7 @@ async function startApp() {
   try {
     ctx.me = await S.me();
     const avatar = pickImage(ctx.me.images, 64);
-    $('#user-chip').innerHTML = `${avatar ? `<img src="${esc(avatar)}" alt="">` : icon('person')}<span>${esc(ctx.me.display_name || '')}</span>`;
+    $('#user-chip').innerHTML = `${avatar ? `<img src="${esc(avatar)}" alt="">` : icon('person')}<span class="label">${esc(ctx.me.display_name || '')}</span>`;
   } catch {}
 
   bus.addEventListener('state', renderPlayer);
