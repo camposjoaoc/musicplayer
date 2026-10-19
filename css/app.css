@@ -31,6 +31,8 @@ body {
   cursor: default;
 }
 [hidden] { display: none !important; }
+/* Navegando pelo controle: esconde o cursor do navegador da TV (onde ele respeita o CSS) */
+html.kbd-mode, html.kbd-mode * { cursor: none !important; }
 img { display: block; }
 h1, h2, p { margin: 0; }
 h1 { font-size: 3rem; font-weight: 800; letter-spacing: -0.02em; }

@@ -567,8 +567,30 @@ document.addEventListener('click', (e) => {
   Promise.resolve(actions[el.dataset.action]?.(el.dataset, el)).catch((err) => toast(explain(err)));
 });
 
-// Mouse (teste no computador): passar por cima foca
+// Mouse x controle remoto. O navegador da TV mostra um cursor parado na tela: quando a
+// página rola com as setas, itens passam por baixo dele e o "mouseover" roubava o foco.
+// Agora o mouse só vale depois de um movimento real do ponteiro; qualquer tecla volta
+// ao modo controle (e esconde o cursor onde o navegador permitir).
+let pointerMode = false;
+let lastPointer = '';
+document.documentElement.classList.add('kbd-mode');
+
+document.addEventListener('mousemove', (e) => {
+  // O Chrome também dispara mousemove "sintético" quando a página rola sob o cursor parado:
+  // mesma posição, então é ignorado.
+  const xy = `${e.screenX},${e.screenY}`;
+  if (xy === lastPointer) return;
+  const first = !lastPointer;
+  lastPointer = xy;
+  if (first) return; // primeira posição conhecida ainda não é movimento
+  if (!pointerMode) {
+    pointerMode = true;
+    document.documentElement.classList.remove('kbd-mode');
+  }
+}, { passive: true });
+
 document.addEventListener('mouseover', (e) => {
+  if (!pointerMode) return;
   const el = e.target.closest('[data-focus]');
   if (el && activeRoot().contains(el)) focus(el, { scroll: false });
 });
@@ -595,6 +617,10 @@ function typedChar(e) {
 document.addEventListener('keydown', (e) => {
   lastInput = Date.now();
   activateAudio();
+  if (pointerMode) {
+    pointerMode = false;
+    document.documentElement.classList.add('kbd-mode');
+  }
 
   const ch = typedChar(e);
   if (ch) { e.preventDefault(); searchKey(ch); return; }
