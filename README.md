@@ -1,4 +1,4 @@
-# Spotify TV (Titan OS)
+# MusicPlayer (Titan OS)
 
 Web app pessoal para ouvir Spotify na Philips 55PUS8949/12 (Titan OS), feito para o controle remoto.
 A TV vira um dispositivo **Spotify Connect** de verdade (via Web Playback SDK) e também controla
@@ -54,7 +54,7 @@ funciona na versão publicada; no computador use "Entrar aqui".
 ## 3. Publicar (GitHub Pages)
 
 ```bash
-git init && git add . && git commit -m "Spotify TV"
+git init && git add . && git commit -m "MusicPlayer"
 gh repo create spotify-tv --public --source . --push
 gh api repos/{owner}/spotify-tv/pages -X POST -f "source[branch]=main" -f "source[path]=/"
 ```

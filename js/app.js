@@ -64,7 +64,7 @@ function back() {
     render({ restore: true });
     return;
   }
-  confirmDialog('Sair do Spotify TV?', 'Sair', () => {
+  confirmDialog('Sair do MusicPlayer?', 'Sair', () => {
     window.close();
     setTimeout(() => toast('Use o botão Home do controle para sair.'), 400);
   });
@@ -165,7 +165,7 @@ async function openPlaylistPicker(d) {
       {
         icon: 'plus', label: 'Nova playlist',
         run: async () => {
-          const p = await S.createPlaylist(`Criada na TV · ${date}`, 'Criada pelo Spotify TV');
+          const p = await S.createPlaylist(`Criada na TV · ${date}`, 'Criada pelo MusicPlayer');
           await S.addToPlaylist(p.id, [d.uri]);
           editablePlaylists = null;
           toast(`Adicionada à nova playlist “${p.name}”`);
