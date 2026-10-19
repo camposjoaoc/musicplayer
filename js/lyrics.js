@@ -3,7 +3,7 @@
 import { esc } from './util.js';
 
 const BASE = 'https://lrclib.net/api';
-const HEADERS = { 'Lrclib-Client': 'spotify-tv (https://github.com/camposjoaoc/spotify-tv)' };
+const HEADERS = { 'Lrclib-Client': 'musicplayer (https://github.com/camposjoaoc/musicplayer)' };
 const cache = new Map();
 
 // "Música - Remastered 2011", "Música (feat. X)" → "Música"

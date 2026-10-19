@@ -36,7 +36,7 @@ no QR code. O `code_verifier` do PKCE nunca sai da TV, então o código intercep
 1. Acesse <https://developer.spotify.com/dashboard> → **Create app**.
 2. Marque **Web API** e **Web Playback SDK**.
 3. Em **Redirect URIs**, cadastre (pode cadastrar os dois):
-   - `https://SEU-USUARIO.github.io/spotify-tv/callback.html` (versão publicada)
+   - `https://SEU-USUARIO.github.io/musicplayer/callback.html` (versão publicada)
    - `http://127.0.0.1:5173/callback.html` (teste no computador — o Spotify não aceita `localhost`)
 4. Copie o **Client ID** para [js/config.js](js/config.js).
 5. Se outra pessoa da casa for usar, adicione o e-mail dela em **User Management** (máx. 5 usuários em modo dev).
@@ -55,11 +55,11 @@ funciona na versão publicada; no computador use "Entrar aqui".
 
 ```bash
 git init && git add . && git commit -m "MusicPlayer"
-gh repo create spotify-tv --public --source . --push
-gh api repos/{owner}/spotify-tv/pages -X POST -f "source[branch]=main" -f "source[path]=/"
+gh repo create musicplayer --public --source . --push
+gh api repos/{owner}/musicplayer/pages -X POST -f "source[branch]=main" -f "source[path]=/"
 ```
 
-Em ~1 minuto o app fica em `https://SEU-USUARIO.github.io/spotify-tv/`.
+Em ~1 minuto o app fica em `https://SEU-USUARIO.github.io/musicplayer/`.
 O Client ID não é segredo (PKCE não usa client secret), então o repositório pode ser público.
 
 ## 4. Abrir na TV (DevView do Titan OS)
