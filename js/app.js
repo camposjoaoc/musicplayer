@@ -587,7 +587,45 @@ document.addEventListener('mousemove', (e) => {
     pointerMode = true;
     document.documentElement.classList.remove('kbd-mode');
   }
+  updateEdgeScroll(e.clientX, e.clientY);
 }, { passive: true });
+
+// Rolagem pelas bordas: no "modo cursor" do navegador da TV as setas mexem o ponteiro e
+// não chegam ao app. Com o ponteiro perto da borda de uma fileira ou da página, ela rola.
+let edge = null;
+let edgeFrame = 0;
+
+function updateEdgeScroll(x, y) {
+  edge = null;
+  const target = document.elementFromPoint(x, y);
+  const row = target?.closest('[data-nav-row]');
+  if (row) {
+    const r = row.getBoundingClientRect();
+    const zone = Math.min(180, r.width * 0.12);
+    if (x > r.right - zone) edge = { box: row, axis: 'scrollLeft', speed: 4 + 18 * (x - (r.right - zone)) / zone };
+    else if (x < r.left + zone) edge = { box: row, axis: 'scrollLeft', speed: -(4 + 18 * ((r.left + zone) - x) / zone) };
+  }
+  if (!edge) {
+    const page = target?.closest('.view-scroll');
+    if (page) {
+      const r = page.getBoundingClientRect();
+      const zone = Math.min(150, r.height * 0.15);
+      if (y > r.bottom - zone) edge = { box: page, axis: 'scrollTop', speed: 4 + 20 * (y - (r.bottom - zone)) / zone };
+      else if (y < r.top + zone) edge = { box: page, axis: 'scrollTop', speed: -(4 + 20 * ((r.top + zone) - y) / zone) };
+    }
+  }
+  if (edge && !edgeFrame) edgeFrame = requestAnimationFrame(edgeStep);
+}
+
+function edgeStep() {
+  edgeFrame = 0;
+  if (!edge || !pointerMode) return;
+  const before = edge.box[edge.axis];
+  edge.box[edge.axis] = before + edge.speed;
+  if (edge.box[edge.axis] === before) { edge = null; return; } // chegou ao fim
+  edgeFrame = requestAnimationFrame(edgeStep);
+}
+document.addEventListener('mouseleave', () => { edge = null; });
 
 document.addEventListener('mouseover', (e) => {
   if (!pointerMode) return;
@@ -619,6 +657,7 @@ document.addEventListener('keydown', (e) => {
   activateAudio();
   if (pointerMode) {
     pointerMode = false;
+    edge = null;
     document.documentElement.classList.add('kbd-mode');
   }
 
@@ -763,6 +802,16 @@ async function startApp() {
 
 window.addEventListener('spotv:logout', () => location.replace(location.pathname));
 
+// No navegador da TV o Voltar do controle costuma ser o "voltar página" do navegador, que
+// sairia do app. Uma entrada extra no histórico transforma esse voltar no Voltar do app.
+function trapBrowserBack() {
+  history.pushState({ spotv: true }, '');
+  window.addEventListener('popstate', () => {
+    history.pushState({ spotv: true }, '');
+    back();
+  });
+}
+
 // Limpa a chave do YouTube e o cache de clipes de versões anteriores do app
 store.del('spotv.ytkey');
 store.del('spotv.clips');
@@ -776,6 +825,7 @@ async function boot() {
     return showLogin(e.message);
   }
   if (!auth.isLoggedIn()) return showLogin();
+  trapBrowserBack();
   startApp();
 }
 
